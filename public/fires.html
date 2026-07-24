@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#081019">
+  <title>Current wildfires — boundary tracker</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="stylesheet" href="./fires.css">
+</head>
+<body>
+  <main class="fires">
+    <header class="fires__header">
+      <h1>Current wildfires</h1>
+      <p>Live incidents from NIFC. Pick a fire to open its near-real-time boundary view.</p>
+      <input id="fire-search" type="search" placeholder="Search by name or state…"
+             aria-label="Search fires" autocomplete="off">
+    </header>
+    <p id="fires-status" role="status">Loading current incidents…</p>
+    <ul id="fires-list" class="fires__list"></ul>
+  </main>
+  <script src="./fires.js" type="module"></script>
+</body>
+</html>

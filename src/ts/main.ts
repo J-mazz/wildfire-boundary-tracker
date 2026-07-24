@@ -5,7 +5,15 @@ import { SettingsController } from './core/SettingsController';
 import type { FireBootstrap, Snapshot, SnapshotCatalog } from './types';
 import '../styles.css';
 
-const CATALOG_URL = './data/catalog.json';
+/** With ?fire=irwin:<id> the live engine synthesizes the catalog; otherwise use the static one. */
+function catalogUrl(): string {
+  const fire = new URLSearchParams(window.location.search).get('fire');
+  if (fire && /^irwin:[0-9a-fA-F-]{20,40}$/.test(fire)) {
+    return `./api/catalog?fire=${encodeURIComponent(fire)}`;
+  }
+  return './data/catalog.json';
+}
+const CATALOG_URL = catalogUrl();
 
 const requiredElement = <T extends HTMLElement>(id: string): T => {
   const element = document.getElementById(id);
