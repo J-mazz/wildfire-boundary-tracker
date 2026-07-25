@@ -31,6 +31,9 @@ export function validateCatalog(value: unknown): SnapshotCatalog {
     if (!isRecord(candidate) || typeof candidate.id !== 'string' || typeof candidate.observedAt !== 'string') {
       throw new Error('Every snapshot requires id and observedAt.');
     }
+    if (candidate.status !== 'ready' && candidate.status !== 'processing' && candidate.status !== 'awaiting-data') {
+      throw new Error(`Snapshot ${candidate.id} has an invalid status.`);
+    }
     if (!Array.isArray(candidate.layers)) throw new Error(`Snapshot ${candidate.id} has no layers array.`);
     if (ids.has(candidate.id)) throw new Error(`Duplicate snapshot id: ${candidate.id}`);
     ids.add(candidate.id);
@@ -44,6 +47,9 @@ export function validateCatalog(value: unknown): SnapshotCatalog {
     for (const layer of candidate.layers) {
       if (!isRecord(layer) || typeof layer.id !== 'string' || typeof layer.status !== 'string') {
         throw new Error(`Snapshot ${candidate.id} contains an invalid layer.`);
+      }
+      if (layer.status !== 'ready' && layer.status !== 'processing' && layer.status !== 'unavailable') {
+        throw new Error(`Layer ${layer.id} has an invalid status.`);
       }
       if (layer.status === 'ready' && typeof layer.url !== 'string' && !Array.isArray(layer.tiles)) {
         throw new Error(`Ready layer ${layer.id} must provide url or tiles.`);

@@ -15,11 +15,15 @@ npm test
 Two independent C++26 modules are built:
 
 ```bash
-npm run build:wasm         # browser renderer and DEM geosplat decoder
+npm run build:wasm         # browser DEM geosplat decoder
 npm run build:worker-wasm  # import-free FIRMS parser and footprint engine
 ```
 
 `npm run build:pages` builds both before Wrangler bundles the Pages Functions.
+`npm run dev` builds that same artifact and serves it through `wrangler pages dev`, so
+the `/api/incidents`, `/api/catalog`, and `/api/firms` paths run in the local loop. It
+loads the uncommitted `.env.local` file, which must define `FIRMS_MAP_KEY` for live VIIRS
+requests.
 
 ## ncnn and Vulkan
 

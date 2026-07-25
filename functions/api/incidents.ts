@@ -36,7 +36,7 @@ export const onRequestGet: PagesFunction = async (context) => {
   if (cached) return cached;
 
   const query = new URLSearchParams({
-    where: 'IncidentSize > 0 AND IrwinID IS NOT NULL',
+    where: 'IrwinID IS NOT NULL',
     outFields: FIELDS,
     orderByFields: 'FireDiscoveryDateTime DESC',
     resultRecordCount: '300',

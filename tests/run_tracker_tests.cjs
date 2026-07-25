@@ -16,6 +16,13 @@ run('npm', ['run', 'build']);
 
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 const exists = (relative) => fs.existsSync(path.join(root, relative));
+const containsFiles = (relative) => {
+  const target = path.join(root, relative);
+  if (!fs.existsSync(target)) return false;
+  if (!fs.statSync(target).isDirectory()) return true;
+  return fs.readdirSync(target, { recursive: true, withFileTypes: true })
+    .some((entry) => entry.isFile());
+};
 const landing = read('dist/index.html');
 const mapPage = read('dist/map.html');
 const bundle = read('dist/client.js');
@@ -26,6 +33,7 @@ const catalogFunction = read('functions/api/catalog.ts');
 const workerMiddleware = read('functions/api/_engine.ts');
 const workerBuild = read('tools/build_worker_wasm.sh');
 const browserBuild = read('tools/build_wasm.sh');
+const incidentsFunction = read('functions/api/incidents.ts');
 const ncnnBuild = read('tools/build_ncnn_vulkan.sh');
 const ncnnSource = read('src/native/ncnn_vulkan_batch.cpp');
 
@@ -46,12 +54,26 @@ assert.match(mapSource, /GeosplatLayer/, 'MapController lost DEM geosplat suppor
 assert.match(geosplatSource, /metadataUrl/, 'geosplat metadata must be catalog-selectable');
 assert.match(bundle, /wildfire-geosplat/, 'geosplat renderer was not bundled');
 assert.match(browserBuild, /geosplat\.cppm/, 'browser WASM build lost geosplat decoding');
+assert.doesNotMatch(browserBuild, /flatbuffer|buffer_parser|renderer\.cppm|shader_manager|initialize_webgl_context|render_frame/, 'dead SceneGraph pipeline returned');
+for (const removed of [
+  'src/cpp/buffer_parser.cppm',
+  'src/cpp/renderer.cppm',
+  'src/cpp/shader_manager.cppm',
+  'src/cpp/flatbuffers',
+  'src/scene_graph.fbs',
+  'vendor'
+]) assert.ok(!containsFiles(removed), `dead browser pipeline remains: ${removed}`);
 
 assert.match(catalogFunction, /startedAt:/, 'live catalog event metadata is incomplete');
 assert.match(catalogFunction, /status: hasData \? 'ready' : 'awaiting-data'/, 'snapshot status contract drifted');
 assert.match(catalogFunction, /status: hasData \? 'ready' : 'unavailable'/, 'layer status contract drifted');
 assert.match(workerMiddleware, /firmsEngineModule/, 'TypeScript middleware must invoke C++ WASM');
 assert.doesNotMatch(workerMiddleware, /split\('\n'\)|parseCsv/, 'FIRMS CSV parsing leaked back into TypeScript');
+assert.match(workerMiddleware, /await Promise\.all\(FIRMS_SOURCES\.flatMap/, 'FIRMS fetch lanes must run concurrently');
+assert.ok(workerMiddleware.indexOf('await ingestResponse') < workerMiddleware.indexOf('defer(cache.put'), 'FIRMS payload must parse before entering cache');
+assert.match(workerMiddleware, /defer\(cache\.delete\(item\.cacheKey\)\)/, 'invalid cached FIRMS payloads must be evicted');
+assert.match(workerMiddleware, /Math\.sqrt\(sizeAcres \* 4046\.86 \/ Math\.PI\)/, 'incident acreage must grow the FIRMS query footprint');
+assert.doesNotMatch(incidentsFunction, /IncidentSize > 0/, 'new zero-size incidents must remain discoverable');
 for (const endpoint of ['_engine', 'catalog', 'firms', 'incidents']) {
   assert.ok(exists(`functions/api/${endpoint}.ts`), `${endpoint} Pages Function must be TypeScript`);
   assert.ok(!exists(`functions/api/${endpoint}.js`), `${endpoint} legacy JavaScript Function remains`);
@@ -76,8 +98,56 @@ const records = new DataView(engine.memory.buffer, engine.firms_records(), 128);
 assert.equal(records.getFloat64(0, true), 42.5);
 assert.equal(records.getFloat64(8, true), -116.1);
 assert.equal(Number(records.getBigInt64(16, true)), Date.parse('2026-07-24T22:01:00Z'));
+const upstreamError = Buffer.from('Exceeded transaction limit');
+engine.firms_reset();
+new Uint8Array(engine.memory.buffer, engine.firms_input(), upstreamError.length).set(upstreamError);
+assert.equal(engine.firms_ingest_csv(upstreamError.length), -2, 'HTTP 200 FIRMS error text must fail CSV validation');
+assert.equal(engine.firms_count(), 0, 'invalid FIRMS bodies must not add records');
 assert.match(workerBuild, /-std=c\+\+26/, 'Worker WASM must compile as C++26');
 assert.match(workerBuild, /STANDALONE_WASM=1/, 'Worker WASM must not use browser glue');
+assert.match(workerBuild, /INITIAL_MEMORY=20971520/, 'Worker WASM memory budget drifted');
+
+const catalogTestBundle = path.join(root, 'build', 'tests', 'catalog-client.cjs');
+require('esbuild').buildSync({
+  entryPoints: [path.join(root, 'src/ts/network/CatalogClient.ts')],
+  bundle: true,
+  platform: 'node',
+  format: 'cjs',
+  outfile: catalogTestBundle
+});
+const { validateCatalog } = require(catalogTestBundle);
+const liveCatalogFixture = {
+  version: '1',
+  updatedAt: '2026-07-25T12:00:00Z',
+  pollIntervalSeconds: 300,
+  event: {
+    id: 'irwin-123',
+    name: 'Contract Fire',
+    startedAt: '2026-07-25T09:00:00Z',
+    center: [-120, 40],
+    bounds: [-121, 39, -119, 41]
+  },
+  snapshots: [{
+    id: 'frame-2026-07-25T12-00-00Z',
+    observedAt: '2026-07-25T12:00:00Z',
+    label: '2026-07-25 12:00 UTC',
+    status: 'awaiting-data',
+    layers: [{
+      id: 'firms-2026-07-25T12-00-00Z',
+      label: 'VIIRS thermal detections',
+      kind: 'firms',
+      format: 'geojson',
+      status: 'unavailable',
+      statusReason: 'No VIIRS detections in this frame'
+    }]
+  }]
+};
+assert.deepEqual(validateCatalog(liveCatalogFixture), liveCatalogFixture, 'live engine catalog must pass the client validator');
+assert.throws(
+  () => validateCatalog({ ...liveCatalogFixture, snapshots: [{ ...liveCatalogFixture.snapshots[0], status: 'missing' }] }),
+  /invalid status/,
+  'out-of-contract snapshot statuses must be rejected'
+);
 
 assert.match(ncnnBuild, /-std=c\+\+26/, 'ncnn executor must compile as C++26');
 assert.match(ncnnSource, /use_vulkan_compute = true/, 'ncnn executor must require Vulkan compute');

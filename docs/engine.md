@@ -6,8 +6,10 @@ FIRMS supplies the recurring VIIRS observations that grow it.
 ## Data flow
 
 1. NIFC/IRWIN supplies the incident name, discovery time, and origin point.
-2. A 12 km buffer around that point seeds the first FIRMS request.
-3. TypeScript middleware fetches VIIRS data in four-day batches and streams response
+2. A buffer around that point seeds the FIRMS request. Its radius is at least 12 km and
+  grows with the incident acreage reported by NIFC.
+3. TypeScript middleware fetches VIIRS data in parallel four-day batch lanes, then
+  serially streams each valid response
   bytes directly into a fresh C++26 WebAssembly instance.
 4. C++ parses CSV using raw `const char*` cursors and pointer arithmetic, sorts and
   deduplicates fixed 64-byte records in place, then grows the footprint with a bounded
@@ -28,7 +30,7 @@ operation so mutable linear memory never crosses requests.
 - `GET /api/catalog?fire=irwin:<IrwinID>`
   Synthesizes a snapshot catalog in the same contract as the static
   `dist/data/catalog.json`, so the frontend cannot tell a live fire from a curated one.
-  Edge-cached 15 minutes per fire.
+  Edge-cached 5 minutes per fire, matching its live polling interval.
 
 - `GET /api/firms?fire=irwin:<id>&frame=<iso>&days=<n>`
   Per-frame VIIRS GeoJSON with FRP, brightness, confidence, and day/night properties
@@ -41,9 +43,13 @@ the compute module is `src/cpp/firms_engine.cpp` and builds to
 ## FIRMS quota protection
 
 - FIRMS requests use four-day batches across SNPP, NOAA-20, and NOAA-21.
+- Batch fetches run concurrently; ingestion remains serial because one request-local
+  WASM instance owns the input buffer.
 - Bounds are quantized to 0.05 degrees so users viewing the same fire share cache keys.
 - Closed historical batches cache for 6 hours; the batch containing today caches for
   20 minutes.
+- A batch is cached only after the WASM parser accepts it. Invalid HTTP 200 error bodies
+  are skipped, and invalid legacy cache entries are evicted without sinking other lanes.
 - CSV is streamed into an 8 MiB WASM input buffer. Oversized responses fail explicitly.
 - The record arena holds 131,072 detections and the footprint has a 4 degree span cap.
 

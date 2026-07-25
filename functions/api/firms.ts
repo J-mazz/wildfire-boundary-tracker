@@ -1,25 +1,25 @@
 import {
   type Env,
+  frameCacheRequest,
+  frameResponse,
   fetchDetections,
   fetchIncident,
   parseFireParam,
-  seedFootprint,
-  toFrameFeatures
+  seedFootprint
 } from './_engine';
-
-const CACHE_SECONDS = 1800;
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   const url = new URL(context.request.url);
   const irwinId = parseFireParam(url.searchParams.get('fire'));
   const frame = url.searchParams.get('frame');
   const days = Number(url.searchParams.get('days') ?? '10');
-  if (!irwinId || !frame || !/^\d{4}-\d{2}-\d{2}T\d{2}:00:00Z$/.test(frame)) {
-    return Response.json({ error: 'Pass ?fire=irwin:<id>&frame=<iso frame start>.' }, { status: 400 });
+  if (!irwinId || !frame || !/^\d{4}-\d{2}-\d{2}T\d{2}:00:00Z$/.test(frame)
+    || !Number.isInteger(days) || days < 1 || days > 10) {
+    return Response.json({ error: 'Pass ?fire=irwin:<id>&frame=<iso frame start>&days=<1-10>.' }, { status: 400 });
   }
 
   const cache = caches.default;
-  const cacheKey = new Request(`https://firms-frame-cache.internal/${irwinId.toLowerCase()}/${frame}/${days}`);
+  const cacheKey = frameCacheRequest(irwinId, frame, days);
   const cached = await cache.match(cacheKey);
   if (cached) return cached;
 
@@ -28,7 +28,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   const result = await fetchDetections(
     context.env,
-    seedFootprint(incident.center),
+    seedFootprint(incident.center, incident.sizeAcres),
     days,
     cache,
     (promise) => context.waitUntil(promise)
@@ -37,13 +37,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     return Response.json({ error: result.reason }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   }
 
-  const features = toFrameFeatures(result.detections, frame);
-  if (features.length === 0) return Response.json({ error: 'No detections in this frame.' }, { status: 404 });
+  const response = frameResponse(result.detections, frame);
+  const body = await response.clone().json<{ features: unknown[] }>();
+  if (body.features.length === 0) return Response.json({ error: 'No detections in this frame.' }, { status: 404 });
 
-  const response = Response.json(
-    { type: 'FeatureCollection', properties: { observedAt: frame, source: 'NASA FIRMS VIIRS' }, features },
-    { headers: { 'Cache-Control': `public, max-age=${CACHE_SECONDS}` } }
-  );
   context.waitUntil(cache.put(cacheKey, response.clone()));
   return response;
 };

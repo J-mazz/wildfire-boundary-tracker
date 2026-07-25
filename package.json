@@ -10,7 +10,7 @@
     "build:wasm": "bash tools/build_wasm.sh",
     "build:worker-wasm": "bash tools/build_worker_wasm.sh",
     "deploy:pages": "npm run build:pages && wrangler pages deploy dist --project-name wildfire-boundary-tracker --branch main",
-    "dev": "npm run build && node tools/dev_server.js",
+    "dev": "npm run build:pages && wrangler pages dev dist --env-file .env.local",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.functions.json",
     "test": "npm run build:wasm && npm run build:worker-wasm && npm run typecheck && node tests/run_tracker_tests.cjs"
   },

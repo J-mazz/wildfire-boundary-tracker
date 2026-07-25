@@ -26,7 +26,7 @@ emcc src/cpp/firms_engine.cpp \
   -sSTANDALONE_WASM=1 \
   -sFILESYSTEM=0 \
   -sALLOW_MEMORY_GROWTH=0 \
-  -sINITIAL_MEMORY=33554432 \
+  -sINITIAL_MEMORY=20971520 \
   -sSTACK_SIZE=1048576 \
   -Wl,--no-entry \
   -sEXPORTED_FUNCTIONS='["_firms_input","_firms_input_capacity","_firms_reset","_firms_ingest_csv","_firms_finalize","_firms_records","_firms_count","_firms_record_stride","_firms_bound"]' \

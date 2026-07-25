@@ -14,6 +14,7 @@ const KM_PER_DEGREE_LATITUDE = 111.32;
 const BATCH_DAYS = 4;
 const MAX_HISTORY_DAYS = 10;
 const RECORD_STRIDE = 64;
+export const FRAME_CACHE_SECONDS = 1800;
 
 export type Bounds = [west: number, south: number, east: number, north: number];
 
@@ -84,6 +85,14 @@ interface Batch {
   ttl: number;
 }
 
+interface BatchFetch {
+  batch: Batch;
+  cacheKey: Request;
+  response: Response | null;
+  fromCache: boolean;
+  failure: string | null;
+}
+
 function createEngine(): FirmsExports {
   const exports = new WebAssembly.Instance(firmsEngineModule, {}).exports;
   if (!(exports.memory instanceof WebAssembly.Memory)
@@ -143,9 +152,16 @@ export async function fetchIncident(irwinId: string): Promise<Incident | null> {
   };
 }
 
-export function seedFootprint([longitude, latitude]: [number, number]): Bounds {
-  const latitudeDelta = SEED_RADIUS_KM / KM_PER_DEGREE_LATITUDE;
-  const longitudeDelta = SEED_RADIUS_KM
+export function seedFootprint(
+  [longitude, latitude]: [number, number],
+  sizeAcres: number | null = null
+): Bounds {
+  const areaRadiusKm = sizeAcres !== null && sizeAcres > 0
+    ? Math.sqrt(sizeAcres * 4046.86 / Math.PI) / 1000
+    : 0;
+  const radiusKm = Math.max(SEED_RADIUS_KM, areaRadiusKm);
+  const latitudeDelta = radiusKm / KM_PER_DEGREE_LATITUDE;
+  const longitudeDelta = radiusKm
     / (KM_PER_DEGREE_LATITUDE * Math.max(0.2, Math.cos(latitude * Math.PI / 180)));
   return [
     longitude - longitudeDelta,
@@ -204,6 +220,41 @@ async function ingestResponse(response: Response, engine: FirmsExports): Promise
   }
 }
 
+async function fetchBatch(
+  env: Env,
+  source: typeof FIRMS_SOURCES[number],
+  area: string,
+  batch: Batch,
+  cache: Cache | null
+): Promise<BatchFetch> {
+  const cacheKey = new Request(`https://firms-cache.internal/${source}/${area}/${batch.length}/${batch.start}`);
+  try {
+    const cached = cache ? await cache.match(cacheKey) : undefined;
+    if (cached) return { batch, cacheKey, response: cached, fromCache: true, failure: null };
+
+    const upstreamUrl = `${FIRMS_AREA}/${env.FIRMS_MAP_KEY}/${source}/${area}/${batch.length}/${batch.start}`;
+    const response = await fetch(upstreamUrl, { headers: { Accept: 'text/csv' } });
+    if (!response.ok) {
+      return {
+        batch,
+        cacheKey,
+        response: null,
+        fromCache: false,
+        failure: `${source} returned HTTP ${response.status}`
+      };
+    }
+    return { batch, cacheKey, response, fromCache: false, failure: null };
+  } catch (error) {
+    return {
+      batch,
+      cacheKey,
+      response: null,
+      fromCache: false,
+      failure: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
 function fixedString(bytes: Uint8Array, offset: number, capacity: number): string {
   let end = offset;
   const limit = offset + capacity;
@@ -256,36 +307,46 @@ export async function fetchDetections(
   const engine = createEngine();
   engine.firms_reset();
   const area = quantizeBounds(bounds).join(',');
+  const batches = makeBatches(dayRange, now);
+  const fetched = await Promise.all(FIRMS_SOURCES.flatMap((source) =>
+    batches.map((batch) => fetchBatch(env, source, area, batch, cache))
+  ));
   let successfulBatches = 0;
-  for (const source of FIRMS_SOURCES) {
-    for (const batch of makeBatches(dayRange, now)) {
-      const upstreamUrl = `${FIRMS_AREA}/${env.FIRMS_MAP_KEY}/${source}/${area}/${batch.length}/${batch.start}`;
-      const cacheKey = new Request(`https://firms-cache.internal/${source}/${area}/${batch.length}/${batch.start}`);
-      let response = cache ? await cache.match(cacheKey) : undefined;
-      if (!response) {
-        response = await fetch(upstreamUrl, { headers: { Accept: 'text/csv' } });
-        if (!response.ok) continue;
-        if (cache) {
-          const cached = new Response(response.clone().body, {
-            headers: { 'Content-Type': 'text/csv', 'Cache-Control': `public, max-age=${batch.ttl}` }
-          });
-          defer(cache.put(cacheKey, cached));
-        }
-      }
-      await ingestResponse(response, engine);
+  const failures: string[] = [];
+  for (const item of fetched) {
+    if (!item.response) {
+      failures.push(item.failure ?? 'request failed');
+      continue;
+    }
+
+    const cacheCopy = !item.fromCache && cache ? item.response.clone() : null;
+    try {
+      await ingestResponse(item.response, engine);
       ++successfulBatches;
+      if (cache && cacheCopy) {
+        const cached = new Response(cacheCopy.body, {
+          headers: { 'Content-Type': 'text/csv', 'Cache-Control': `public, max-age=${item.batch.ttl}` }
+        });
+        defer(cache.put(item.cacheKey, cached));
+      }
+    } catch (error) {
+      failures.push(error instanceof Error ? error.message : String(error));
+      if (cache && item.fromCache) defer(cache.delete(item.cacheKey));
     }
   }
 
-  if (successfulBatches === 0) {
-    return { detections: null, bounds, reason: 'NASA FIRMS is temporarily unavailable' };
+  if (successfulBatches === 0 && engine.firms_count() === 0) {
+    const detail = failures[0] ? `: ${failures[0]}` : '';
+    return { detections: null, bounds, reason: `NASA FIRMS is temporarily unavailable${detail}` };
   }
 
   engine.firms_finalize(...bounds, PADDING_DEGREES, MAX_SPAN_DEGREES);
   return {
     detections: readDetections(engine),
     bounds: [0, 1, 2, 3].map((index) => engine.firms_bound(index)) as Bounds,
-    reason: null
+    reason: failures.length > 0
+      ? `${failures.length} of ${fetched.length} FIRMS batches failed; available detections may be incomplete.`
+      : null
   };
 }
 
@@ -319,4 +380,19 @@ export function toFrameFeatures(rows: Detection[], frameIso: string): PointFeatu
       geometry: { type: 'Point', coordinates: [row.lon, row.lat] }
     }];
   });
+}
+
+export function frameCacheRequest(irwinId: string, frameIso: string, days: number): Request {
+  return new Request(`https://firms-frame-cache.internal/${irwinId.toLowerCase()}/${frameIso}/${days}`);
+}
+
+export function frameResponse(rows: Detection[], frameIso: string): Response {
+  return Response.json(
+    {
+      type: 'FeatureCollection',
+      properties: { observedAt: frameIso, source: 'NASA FIRMS VIIRS' },
+      features: toFrameFeatures(rows, frameIso)
+    },
+    { headers: { 'Cache-Control': `public, max-age=${FRAME_CACHE_SECONDS}` } }
+  );
 }

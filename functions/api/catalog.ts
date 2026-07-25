@@ -3,13 +3,15 @@ import {
   type Env,
   fetchDetections,
   fetchIncident,
+  frameCacheRequest,
   frameOf,
+  frameResponse,
   observedAtOf,
   parseFireParam,
   seedFootprint
 } from './_engine';
 
-const CACHE_SECONDS = 900;
+const CACHE_SECONDS = 300;
 const MAX_DAYS = 10;
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
@@ -29,7 +31,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const discovered = incident.discoveredAt ? new Date(incident.discoveredAt) : now;
   const ageDays = Math.ceil((now.getTime() - discovered.getTime()) / 86_400_000);
   const dayRange = Math.min(MAX_DAYS, Math.max(1, ageDays));
-  const seedBounds = seedFootprint(incident.center);
+  const seedBounds = seedFootprint(incident.center, incident.sizeAcres);
   const result = await fetchDetections(
     context.env,
     seedBounds,
@@ -43,10 +45,17 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   startAt.setUTCHours(Math.floor(startAt.getUTCHours() / CADENCE_HOURS) * CADENCE_HOURS, 0, 0, 0);
   const framesWithData = new Set((result.detections ?? []).map((row) => frameOf(observedAtOf(row))));
   const snapshots = [];
+  const frameCacheWrites: Promise<void>[] = [];
   for (let time = startAt.getTime(); time <= now.getTime(); time += CADENCE_HOURS * 3_600_000) {
     const frameIso = new Date(time).toISOString().replace(/\.\d{3}Z$/, 'Z');
     const frameId = frameIso.replace(/:/g, '-');
     const hasData = framesWithData.has(frameIso);
+    if (hasData && result.detections) {
+      frameCacheWrites.push(cache.put(
+        frameCacheRequest(irwinId, frameIso, dayRange),
+        frameResponse(result.detections, frameIso)
+      ));
+    }
     snapshots.push({
       id: `frame-${frameId}`,
       observedAt: frameIso,
@@ -60,10 +69,11 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         status: hasData ? 'ready' : 'unavailable',
         ...(hasData
           ? { url: `./api/firms?fire=irwin:${irwinId}&frame=${encodeURIComponent(frameIso)}&days=${dayRange}` }
-          : { statusReason: result.detections ? 'No VIIRS detections in this frame' : (result.reason ?? 'FIRMS unavailable') })
+          : { statusReason: result.reason ?? (result.detections ? 'No VIIRS detections in this frame' : 'FIRMS unavailable') })
       }]
     });
   }
+  if (frameCacheWrites.length > 0) context.waitUntil(Promise.all(frameCacheWrites));
 
   const catalog = {
     version: '1',
