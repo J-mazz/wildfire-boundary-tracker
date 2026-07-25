@@ -18,7 +18,7 @@ function render(filter = '') {
     ...matches.slice(0, 100).map((fire) => {
       const item = document.createElement('li');
       const link = document.createElement('a');
-      link.href = `./?fire=irwin:${encodeURIComponent(fire.irwinId)}`;
+      link.href = `./map.html?fire=irwin:${encodeURIComponent(fire.irwinId)}`;
       const name = document.createElement('strong');
       name.textContent = fire.name;
       const meta = document.createElement('span');

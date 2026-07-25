@@ -1,31 +1,17 @@
 [project]
 name = "wildfire-nrtdv-pipeline"
 version = "0.1.0"
-description = "Geospatial acquisition and SAM-2 processing pipeline for wildfire-NRTDV"
+description = "Offline geospatial preparation for wildfire-boundary-tracker"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
-  "accelerate>=1.10",
   "numpy>=2.0",
-  "nvidia-cudnn-cu13>=9.10",
-  "onnx>=1.19",
-  "onnxruntime-gpu>=1.27",
-  "onnxscript>=0.5",
   "pillow>=11.0",
   "rasterio>=1.4",
-  "torch>=2.7",
-  "torchvision>=0.22",
-  "transformers>=4.57",
 ]
 
 [tool.uv]
 package = false
 
-[tool.uv.sources]
-torch = { index = "pytorch-cpu" }
-torchvision = { index = "pytorch-cpu" }
+# Python is limited to offline geospatial preparation; inference is native ncnn/Vulkan.
 
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true

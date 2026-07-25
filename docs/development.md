@@ -1,75 +1,68 @@
 # Development
 
-Requires Node.js 22+ and [uv](https://docs.astral.sh/uv/) (Python 3.13 and geospatial/SAM-2 dependencies are pinned in `pyproject.toml`/`uv.lock`).
+Requires Node.js 22+, Emscripten 6.0.3, a C++26 compiler, and `uv` for offline geospatial
+tools.
 
 ```bash
 npm install
 uv sync
-npm run dev     # http://localhost:8787
+npm run typecheck
 npm test
 ```
 
-Run every Python tool through uv, e.g. `uv run python tools/import_firms.py --help`.
+## WebAssembly
 
-`npm run dev` serves the built `dist/` on `http://localhost:8787` via
-`tools/dev_server.js`, which also exposes a **dev-only** config endpoint:
-
-- `GET /api/config`: returns `public/data/catalog.config.json`.
-- `PUT /api/config`: validates `{event, app, timeline}`, merges it into the config
-  (preserving pipeline-populated `feeds`), and regenerates `dist/data/catalog.json`.
-
-## Retargeting to another fire (⋮ → Settings)
-
-The in-app **Settings** tab writes directly to `catalog.config.json` through that
-endpoint. Frame the fire on the map, click **Use current map view**, set the timeline,
-and **Save**; the map re-focuses via the catalog poller. Then run the pipeline
-(FIRMS/SAM-2/geosplat/context, below) so the data layers match the new bounds.
-
-Save is dev-only: the static Pages build strips `catalog.config.json` and has no write
-endpoint, so Settings there is read-only and offers **Copy config JSON** instead.
-
-## WASM (C++26, Emscripten)
+Two independent C++26 modules are built:
 
 ```bash
-npm run build:wasm
+npm run build:wasm         # browser renderer and DEM geosplat decoder
+npm run build:worker-wasm  # import-free FIRMS parser and footprint engine
 ```
 
-Sources the vendored `emsdk`, precompiles the `wildfire.*` C++26 modules, and writes the ES module + `.wasm` binary to `public/wasm/` (git-ignored). There is no Rust build path. The geosplat terrain decoder (`src/cpp/geosplat.cppm`) runs through this module in the browser.
+`npm run build:pages` builds both before Wrangler bundles the Pages Functions.
 
-## 3D terrain data
+## ncnn and Vulkan
+
+Install and build the native inference executor locally:
+
+```bash
+bash tools/install_ncnn_local.sh
+npm run build:ncnn
+.tools/bin/ncnn-vulkan-batch --list-devices
+```
+
+The executor accepts converted ncnn `.param` and `.bin` model shards plus one or more
+NCT1 float32 input tensors. It dispatches tensors through concurrent extractors:
+
+```bash
+bash tools/run_sam2_ncnn.sh \
+  --param MODEL.param \
+  --model MODEL.bin \
+  --input-name INPUT \
+  --output-name OUTPUT \
+  --output-dir OUTPUT_DIR \
+  INPUT_1.nct INPUT_2.nct
+```
+
+NCT1 is five little-endian `uint32` values (`magic`, width, height, channels, elements)
+followed by channel-major float32 data. Outputs use the NCO1 header documented by
+`src/native/ncnn_vulkan_batch.cpp`.
+
+Model conversion is an explicit preparation step and converted weights are not committed.
+The tracker does not include a Python inference backend or silently fall back from Vulkan.
+
+## Offline geospatial tools
+
+Python remains only for deterministic geospatial preparation such as Sentinel mosaics
+and DEM splats:
 
 ```bash
 uv run python tools/build_geosplat.py
 ```
 
-Regenerates `public/data/geosplat/terrain.splat` + `meta.json` (GSP1 binary: 512×512 grid of quantized heights, RGB, and surface normals) from the Copernicus GLO-30 DEM and the newest Sentinel scene. Requires network access.
-
-## Contextual KML
+Context KML conversion uses native C++26 and simdjson:
 
 ```bash
 bash tools/install_simdjson_local.sh
 bash tools/fetch_context_kml.sh
 ```
-
-Fetches OSM context, converts it with the native C++26/simdjson utility, and atomically publishes the four KML documents under `public/data/context/`. OpenStreetMap attribution remains visible in the map controls.
-
-## Authenticated SAM-2 processing
-
-Set `HF_TOKEN` in the git-ignored `.env.local`, then:
-
-```bash
-bash tools/run_hotspot_sam2.sh
-```
-
-The token is exported only to the uv-managed process and never appears in arguments or generated assets.
-
-## Local GPU tools
-
-ncnn/Vulkan tools install into the persistent, git-ignored `.tools/` directory:
-
-```bash
-bash tools/install_ncnn_local.sh
-source tools/ncnn_env.sh
-```
-
-`tools/ncnn_env.sh` exports `WILDFIRE_VULKAN_DEVICE_INDEX` and `WILDFIRE_CUDA_DEVICE_INDEX` to select the GPU; note that Vulkan and CUDA enumerate devices independently.

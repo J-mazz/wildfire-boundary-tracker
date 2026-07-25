@@ -34,6 +34,7 @@ __pycache__/
 # Toolchains and persistent project-local binaries
 /emsdk/
 /.tools/
+/.wrangler/
 /.models/
 
 # ML exports and compiled inference engines

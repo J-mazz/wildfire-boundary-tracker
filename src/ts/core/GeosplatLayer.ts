@@ -116,17 +116,19 @@ export class GeosplatLayer implements CustomLayerInterface {
     this.instanceCount = instances.length / floatsPerSplat;
   }
 
-  static async load(onError: (message: string) => void): Promise<GeosplatLayer | null> {
+  static async load(metadataUrl: string, onError: (message: string) => void): Promise<GeosplatLayer | null> {
     try {
-      const metaResponse = await fetch('./data/geosplat/meta.json', { cache: 'no-cache' });
+      const resolvedMetadataUrl = new URL(metadataUrl, window.location.href);
+      const metaResponse = await fetch(resolvedMetadataUrl, { cache: 'no-cache' });
       if (!metaResponse.ok) throw new Error(`Geosplat metadata returned ${metaResponse.status}.`);
       const meta = (await metaResponse.json()) as GeosplatMeta;
+      const payloadUrl = new URL(meta.url, resolvedMetadataUrl);
 
       // Resolved at runtime relative to the bundle; the module ships as a static asset.
       const wasmSpecifier = './wasm/wildfire.js';
       const [factory, payload] = await Promise.all([
         import(wasmSpecifier).then((module) => module.default as () => Promise<unknown>),
-        fetch(meta.url, { cache: 'no-cache' }).then(async (response) => {
+        fetch(payloadUrl, { cache: 'no-cache' }).then(async (response) => {
           if (!response.ok) throw new Error(`Geosplat payload returned ${response.status}.`);
           return new Uint8Array(await response.arrayBuffer());
         })

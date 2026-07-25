@@ -28,22 +28,25 @@ The frontend consumes the same catalog shape from either producer:
 
 ## Snapshot catalog
 
-`public/data/catalog.json` is the frontend/backend contract. Snapshots are chronological and use source observation times. Coverage starts July 16, 2026 because the NASA FIRMS VIIRS outage prevented reliable detections between the fire's July 10 start and July 16. Feeds per snapshot:
+`catalog.json` is the frontend/backend contract. Snapshots are chronological and use
+source observation times. Layer kinds are:
 
-- `sentinel-raster`: georeferenced image (acquisition-driven; carries forward until a newer pass)
-- `firms`: VIIRS GeoJSON points, rendered as a seven-day age/FRP-weighted thermal field
-- `sam-mask`: GeoJSON polygons, accumulated as the persistent fire-body progression
-- `kml`: raw `.kml` or pre-parsed GeoJSON vectors
+- `firms`: VIIRS GeoJSON points, rendered as an age/FRP-weighted thermal field.
+- `sentinel-raster`: optional georeferenced image or XYZ tiles from a publisher.
+- `sam-mask`: optional native ncnn/Vulkan segmentation polygons.
+- `kml`: optional raw KML or pre-parsed GeoJSON vectors.
 
 The frontend polls the catalog every 30 s with ETag and falls back to the last known good copy. Only layers marked `ready` with real source assets are shown; the build never fabricates data.
 
-Layer order is deterministic: satellite base, Sentinel, VIIRS field, SAM-2 body, KML, event outline. In 3D mode the Sentinel raster hides because the terrain splats carry its colors. Publishers should write immutable assets first and replace the catalog atomically last.
-
-Sentinel display and SAM-2 inference use a contrast-stretched B12/B8A/B04 (SWIR2/NIR/red) composite for smoke penetration and burn-scar contrast. The mosaic footprint is four times the event area, biased southeast toward Shady Cove.
+Layer order is deterministic: satellite base, Sentinel, VIIRS field, SAM-2 body, KML,
+event outline. In 3D mode the Sentinel raster hides when a matching terrain splat carries
+its colors. Publishers write immutable assets first and replace catalogs atomically last.
 
 ## Pipeline boundary
 
-Acquisition and SAM-2 inference are excluded from `npm run build`; they belong to scheduled services with credentials, retries, and GPU infrastructure. On failure, the latest valid snapshot is preserved.
+Acquisition and native ncnn/Vulkan inference are excluded from `npm run build`. They run
+as asynchronous publishers with retries and explicit model assets. On failure, the latest
+valid snapshot remains available.
 
 ## Production notes
 
@@ -53,5 +56,6 @@ Acquisition and SAM-2 inference are excluded from `npm run build`; they belong t
 - **Sentinel supports XYZ tiles**: a sentinel observation with `format:"xyz"` and a
   `tiles` array renders as a tiled raster; whole-image `url`+`bounds` remains supported.
   Prefer tiles over whole PNGs at scale.
-- **SAM-2 geometry is simplified** at publish time (Douglas–Peucker, `app.simplifyToleranceMeters`).
+- **SAM-2 geometry** is produced by native ncnn/Vulkan publishers and should be
+  simplified or tiled before catalog publication.
 - **Remaining follow-up:** simplify or tile large KML geometries before serving them.

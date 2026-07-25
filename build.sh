@@ -23,12 +23,12 @@ if [[ "${SOURCE_MAPS:-1}" == "1" ]]; then
 fi
 npx esbuild src/ts/main.ts "${esbuild_args[@]}"
 
-cp src/index.html dist/index.html
+cp src/index.html dist/map.html
 cp -R public/. dist/
-node tools/inject_bootstrap.js public/data/catalog.config.json dist/index.html
-node tools/generate_catalog.js public/data/catalog.config.json dist/data/catalog.json
+cp public/fires.html dist/index.html
+rm -rf dist/data
 node tools/generate_headers.js public/data/catalog.config.json public/_headers.template dist/_headers
-rm -f dist/data/catalog.config.json dist/_headers.template
+rm -f dist/_headers.template
 
 echo "Build complete:"
 find dist -maxdepth 2 -type f -printf '  %p (%s bytes)\n' | sort

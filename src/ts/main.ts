@@ -5,13 +5,14 @@ import { SettingsController } from './core/SettingsController';
 import type { FireBootstrap, Snapshot, SnapshotCatalog } from './types';
 import '../styles.css';
 
-/** With ?fire=irwin:<id> the live engine synthesizes the catalog; otherwise use the static one. */
+/** The generic map always uses a live IRWIN catalog; the landing page owns fire selection. */
 function catalogUrl(): string {
   const fire = new URLSearchParams(window.location.search).get('fire');
   if (fire && /^irwin:[0-9a-fA-F-]{20,40}$/.test(fire)) {
     return `./api/catalog?fire=${encodeURIComponent(fire)}`;
   }
-  return './data/catalog.json';
+  window.location.replace('./');
+  return './api/catalog?fire=invalid';
 }
 const CATALOG_URL = catalogUrl();
 
@@ -36,6 +37,8 @@ const mapController = new MapController('map', bootstrap);
 const statusElement = requiredElement<HTMLSpanElement>('connection-status');
 const menuButton = requiredElement<HTMLButtonElement>('menu-button');
 const terrainButton = requiredElement<HTMLButtonElement>('terrain-button');
+terrainButton.disabled = true;
+terrainButton.title = 'Terrain data is not available for this fire yet.';
 const specificationsPanel = requiredElement<HTMLElement>('specifications-panel');
 const titleElement = requiredElement<HTMLElement>('spec-title');
 const taglineElement = requiredElement<HTMLElement>('spec-tagline');
@@ -243,6 +246,10 @@ function applyCatalog(nextCatalog: SnapshotCatalog, meta: { stale: boolean }): v
     applyBranding(nextCatalog.app.title, nextCatalog.app.tagline);
     void mapController.setBaseImagery(nextCatalog.app.baseImagery);
   }
+  const terrainMetadataUrl = nextCatalog.app?.terrain?.metadataUrl ?? null;
+  mapController.setTerrainMetadataUrl(terrainMetadataUrl);
+  terrainButton.disabled = terrainMetadataUrl === null;
+  terrainButton.title = terrainMetadataUrl ? 'Toggle 3D terrain view' : 'Terrain data is not available for this fire yet.';
   void mapController.setEvent(nextCatalog.event);
   timeline.setSnapshots(nextCatalog.snapshots);
 

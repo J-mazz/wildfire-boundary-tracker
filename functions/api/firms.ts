@@ -1,19 +1,16 @@
-// GET /api/firms?fire=irwin:<id>&frame=<iso>&days=<n> — per-frame VIIRS GeoJSON.
-// Serves only real detections for the requested cadence frame; 404 when the frame is empty.
-
 import {
+  type Env,
   fetchDetections,
   fetchIncident,
-  growFootprint,
   parseFireParam,
   seedFootprint,
   toFrameFeatures
-} from './_engine.js';
+} from './_engine';
 
 const CACHE_SECONDS = 1800;
 
-export async function onRequestGet({ request, env, waitUntil }) {
-  const url = new URL(request.url);
+export const onRequestGet: PagesFunction<Env> = async (context) => {
+  const url = new URL(context.request.url);
   const irwinId = parseFireParam(url.searchParams.get('fire'));
   const frame = url.searchParams.get('frame');
   const days = Number(url.searchParams.get('days') ?? '10');
@@ -27,26 +24,26 @@ export async function onRequestGet({ request, env, waitUntil }) {
   if (cached) return cached;
 
   const incident = await fetchIncident(irwinId);
-  if (!incident) {
-    return Response.json({ error: 'No current NIFC incident with that IrwinID.' }, { status: 404 });
+  if (!incident) return Response.json({ error: 'No current NIFC incident with that IrwinID.' }, { status: 404 });
+
+  const result = await fetchDetections(
+    context.env,
+    seedFootprint(incident.center),
+    days,
+    cache,
+    (promise) => context.waitUntil(promise)
+  );
+  if (!result.detections) {
+    return Response.json({ error: result.reason }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   }
 
-  let bounds = seedFootprint(incident.center);
-  const { detections, reason } = await fetchDetections(env, bounds, days, cache, waitUntil);
-  if (!detections) {
-    return Response.json({ error: reason }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
-  }
-  bounds = growFootprint(bounds, detections);
-
-  const features = toFrameFeatures(detections, frame);
-  if (features.length === 0) {
-    return Response.json({ error: 'No detections in this frame.' }, { status: 404 });
-  }
+  const features = toFrameFeatures(result.detections, frame);
+  if (features.length === 0) return Response.json({ error: 'No detections in this frame.' }, { status: 404 });
 
   const response = Response.json(
     { type: 'FeatureCollection', properties: { observedAt: frame, source: 'NASA FIRMS VIIRS' }, features },
     { headers: { 'Cache-Control': `public, max-age=${CACHE_SECONDS}` } }
   );
-  waitUntil(cache.put(cacheKey, response.clone()));
+  context.waitUntil(cache.put(cacheKey, response.clone()));
   return response;
-}
+};

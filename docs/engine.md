@@ -1,18 +1,22 @@
 # Live engine
 
-The tracker synthesizes a fire view on demand. Nothing is persisted and nothing is
-committed: every request derives from NIFC and NASA FIRMS upstream data, held only in
-the Cloudflare edge cache.
+The tracker synthesizes each fire view on demand. NIFC supplies the initial scope; NASA
+FIRMS supplies the recurring VIIRS observations that grow it.
 
 ## Data flow
 
-1. **Seed**: the NIFC/IRWIN incident record supplies the name, discovery date, and origin
-   point. The initial footprint is a 12 km buffer around the origin.
-2. **Grow**: VIIRS detections inside the footprint expand it (padded, capped at a 4 degree
-   span so a bad request can never cover a continent).
-3. **Frame**: detections are bucketed into 3-hour frames from discovery (bounded by the
-   10-day FIRMS history limit) to now. Only frames containing real detections are `ready`;
-   empty frames carry an honest `statusReason`.
+1. NIFC/IRWIN supplies the incident name, discovery time, and origin point.
+2. A 12 km buffer around that point seeds the first FIRMS request.
+3. TypeScript middleware fetches VIIRS data in four-day batches and streams response
+  bytes directly into a fresh C++26 WebAssembly instance.
+4. C++ parses CSV using raw `const char*` cursors and pointer arithmetic, sorts and
+  deduplicates fixed 64-byte records in place, then grows the footprint with a bounded
+  padding rule.
+5. TypeScript reads the fixed record ABI with `DataView` and serializes catalog and
+  per-frame GeoJSON. It does not parse FIRMS CSV.
+
+The WASM module is import-free, has a fixed 32 MiB heap, and is instantiated per engine
+operation so mutable linear memory never crosses requests.
 
 ## Endpoints (Pages Functions)
 
@@ -30,24 +34,28 @@ the Cloudflare edge cache.
   Per-frame VIIRS GeoJSON with FRP, brightness, confidence, and day/night properties
   (mirrors `tools/import_firms.py`). Returns 404 for empty frames. Edge-cached 30 minutes.
 
-Shared logic lives in `functions/api/_engine.js` (underscore prefix keeps it unrouted).
+All Functions are strict TypeScript. Shared middleware is `functions/api/_engine.ts`;
+the compute module is `src/cpp/firms_engine.cpp` and builds to
+`functions/wasm/firms_engine.wasm`.
 
 ## FIRMS quota protection
 
-The area API is queried in 4-day batches per constellation (SNPP, NOAA-20, NOAA-21).
-Bounds are quantized to a 0.05 degree grid so cache keys collapse across users viewing
-the same fire. Closed historical batches cache for 6 hours; the batch containing today
-caches for 20 minutes. One popular fire costs one set of upstream calls per window,
-regardless of viewer count.
+- FIRMS requests use four-day batches across SNPP, NOAA-20, and NOAA-21.
+- Bounds are quantized to 0.05 degrees so users viewing the same fire share cache keys.
+- Closed historical batches cache for 6 hours; the batch containing today caches for
+  20 minutes.
+- CSV is streamed into an 8 MiB WASM input buffer. Oversized responses fail explicitly.
+- The record arena holds 131,072 detections and the footprint has a 4 degree span cap.
 
 ## Credentials
 
-Only one secret exists, `FIRMS_MAP_KEY`, held as a Pages project secret and used solely
-inside the Functions. The browser never sees a key; NIFC requires none. Without the
-secret the catalog still works, with each frame reporting that FIRMS is unconfigured.
+`FIRMS_MAP_KEY` is a Pages secret used only by TypeScript middleware. It is never sent to
+the browser or stored in WASM. NIFC requires no key.
 
-## Frontend selection
+## Native inference
 
-`src/ts/main.ts` picks the catalog source by URL: with a valid `?fire=irwin:<id>` it polls
-`/api/catalog`, otherwise it serves the static catalog. A fire view is therefore just a
-shareable URL.
+SAM-2 is not executed inside a Pages request. Converted ncnn model shards run through
+the C++26 `ncnn-vulkan-batch` executable on Vulkan-capable native publishers. Multiple
+input tensors are dispatched through concurrent ncnn extractors, and immutable output
+assets are published before a catalog swap. Cloudflare continues serving the last valid
+assets while a publisher is unavailable.

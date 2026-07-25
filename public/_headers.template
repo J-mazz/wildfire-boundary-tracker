@@ -8,6 +8,9 @@
 /index.html
   Cache-Control: public, max-age=0, must-revalidate
 
+/map.html
+  Cache-Control: public, max-age=0, must-revalidate
+
 /client.js
   Cache-Control: public, max-age=0, must-revalidate
 

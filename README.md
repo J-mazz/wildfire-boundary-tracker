@@ -1,27 +1,36 @@
 # Wildfire Boundary Tracker
 
-Live map of any current US wildfire. Pick a fire and it works: no setup, no configuration, no account.
+Live map of current US wildfires. Pick a fire and the tracker derives its initial scope
+from NIFC, then follows three-hour VIIRS observations from NASA FIRMS. No account or GIS
+setup is required.
+
+## Runtime
+
+- **TypeScript frontend**: MapLibre map, timeline, UI, and catalog client.
+- **TypeScript middleware**: Cloudflare Pages Functions handle upstream fetches, cache
+	control, validation, and catalog/GeoJSON serialization.
+- **C++26 WebAssembly**: the edge engine streams FIRMS CSV bytes into fixed linear
+	memory, parses with raw C-string cursors and pointer arithmetic, deduplicates records,
+	and computes the growing footprint. The browser WASM module also retains DEM geosplat
+	decoding and rendering support.
+- **C++26 ncnn/Vulkan**: native, concurrent inference for converted SAM-2 model shards.
+	This is an asynchronous publisher, never a request-time Python backend.
+
+Every rendered layer comes from real observations. Nothing is fabricated.
 
 ## Using it
 
-1. Open [fires.html](public/fires.html) (the landing page) to see current incidents from NIFC, searchable by name or state.
-2. Pick a fire. The map opens at `/?fire=irwin:<id>` and builds itself from live data.
-3. Scrub the three-hour timeline, press Play, or hit Live to follow the newest detections.
+1. Open the current-fire landing page and search by incident name or state.
+2. Pick an incident. Its shareable URL contains only the NIFC IRWIN identifier.
+3. Scrub the three-hour timeline, press Play, or select Live.
 
-## What you're seeing
+## Documentation
 
-- The fire list and initial footprint come from NIFC incident records
-- VIIRS thermal detections (NASA FIRMS) draw the heat field and grow the footprint as the fire spreads
-- The timeline runs from discovery (up to the 10-day FIRMS history limit) to now, in 3-hour frames
+- [Engine](docs/engine.md): edge WASM ABI, middleware, caching, and footprint growth
+- [Development](docs/development.md): builds, local tools, ncnn/Vulkan, and geosplat
+- [Data contract](docs/data-contract.md): catalog and optional layer capabilities
+- [Deployment](docs/deployment.md): Cloudflare Pages, Functions, and secrets
 
-Every layer comes from real observations; nothing is fabricated and nothing is stored. Each view is synthesized on demand from NIFC and FIRMS, with your fire shareable as a plain URL.
-
-This project is a fork of [fire-progression-NRTDV](https://github.com/J-mazz/fire-progression-NRTDV), the curated East Evans Creek instance with Sentinel imagery, SAM-2 segmentation, and 3D terrain.
-
-## Technical documentation
-
-- [Engine](docs/engine.md): API endpoints, data flow, footprint seeding and growth, caching
-- [Development](docs/development.md): local setup, WASM/C++26 build, tooling
-- [Data contract & pipeline](docs/data-contract.md): snapshot catalog format, layer semantics
-- [Deployment](docs/deployment.md): Cloudflare Pages build, Functions, and secrets
+The curated East Evans Creek visualization remains in
+[fire-progression-NRTDV](https://github.com/J-mazz/fire-progression-NRTDV).
 

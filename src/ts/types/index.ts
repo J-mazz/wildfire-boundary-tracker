@@ -20,11 +20,16 @@ export interface BaseImagery {
   tileSize?: number;
 }
 
+export interface TerrainConfig {
+  metadataUrl: string;
+}
+
 export interface AppConfig {
   title: string;
   tagline: string;
   initialZoom?: number;
   baseImagery: BaseImagery;
+  terrain?: TerrainConfig;
   simplifyToleranceMeters?: number;
 }
 

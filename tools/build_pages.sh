@@ -4,6 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 npm run build:wasm
+npm run build:worker-wasm
 SOURCE_MAPS=0 bash build.sh
 
 if find dist -type f \( -name '*.map' -o -name 'catalog.config.json' \) -print -quit | grep -q .; then

@@ -12,9 +12,6 @@ export PATH="$NCNN_ROOT/bin:$PATH"
 export LD_LIBRARY_PATH="$NCNN_ROOT/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export CMAKE_PREFIX_PATH="$NCNN_ROOT${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
 
-# Vulkan enumerates Intel first and the discrete NVIDIA GPU second on this host.
-# Native ncnn callers must pass this index to ncnn::get_gpu_device().
-export WILDFIRE_VULKAN_DEVICE_INDEX="${WILDFIRE_VULKAN_DEVICE_INDEX:-1}"
-
-# CUDA enumerates NVIDIA devices independently; the RTX is CUDA device zero.
+# Vulkan and CUDA enumerate devices independently. Override either index when needed.
+export WILDFIRE_VULKAN_DEVICE_INDEX="${WILDFIRE_VULKAN_DEVICE_INDEX:-0}"
 export WILDFIRE_CUDA_DEVICE_INDEX="${WILDFIRE_CUDA_DEVICE_INDEX:-0}"

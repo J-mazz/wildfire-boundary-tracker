@@ -41,6 +41,7 @@ export class MapController {
   private lastEventKey: string | null = null;
   private geosplat: GeosplatLayer | null = null;
   private geosplatLoading: Promise<GeosplatLayer | null> | null = null;
+  private terrainMetadataUrl: string | null = null;
   private terrainMode = false;
   private currentImageryKey: string;
   private errorHandler: (message: string) => void = () => undefined;
@@ -185,8 +186,12 @@ export class MapController {
 
   async setTerrainMode(enabled: boolean): Promise<boolean> {
     await this.ready;
+    if (enabled && !this.terrainMetadataUrl) {
+      this.errorHandler('Terrain view is not available for this fire yet.');
+      return false;
+    }
     if (enabled && !this.geosplat) {
-      this.geosplatLoading ??= GeosplatLayer.load(this.errorHandler);
+      this.geosplatLoading ??= GeosplatLayer.load(this.terrainMetadataUrl!, this.errorHandler);
       this.geosplat = await this.geosplatLoading;
       if (!this.geosplat) return false;
       const beforeId = CONTEXT_LINE_LAYERS.find((id) => this.map.getLayer(id));
@@ -200,6 +205,17 @@ export class MapController {
     }
     this.map.easeTo({ pitch: enabled ? 60 : 0, duration: 900 });
     return true;
+  }
+
+  setTerrainMetadataUrl(metadataUrl: string | null): void {
+    if (metadataUrl === this.terrainMetadataUrl) return;
+    this.terrainMetadataUrl = metadataUrl;
+    this.geosplatLoading = null;
+    if (!metadataUrl) {
+      this.terrainMode = false;
+      this.geosplat?.setEnabled(false);
+      this.map.easeTo({ pitch: 0, duration: 0 });
+    }
   }
 
   private installPersistentLayers(): void {
