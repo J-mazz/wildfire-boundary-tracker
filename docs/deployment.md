@@ -16,6 +16,15 @@ Required GitHub configuration:
 - Repository secret `CLOUDFLARE_API_TOKEN`, scoped to Account / Cloudflare Pages / Edit
 - Repository variable `CLOUDFLARE_ACCOUNT_ID`
 
-On the deployed site the ⋮ → Settings form is read-only (Copy config JSON). Live
-retargeting from the UI is developed separately in the `wildfire-boundary-tracker` fork;
-here the config only changes through the repo.
+## Pages Functions and secrets
+
+`wrangler pages deploy dist` bundles the top-level `functions/` directory as Pages
+Functions; these power the live engine (see [Engine](engine.md)). The project needs one
+secret for the VIIRS thermal feed:
+
+```bash
+wrangler pages secret put FIRMS_MAP_KEY --project-name <project>
+```
+
+Without it the site still works: the landing page and catalogs load from NIFC, and each
+frame reports that FIRMS is unconfigured.

@@ -6,15 +6,25 @@
 the pipeline. `tools/generate_catalog.js` expands it into the served
 `public/data/catalog.json`. Top-level blocks:
 
-- `event` — id, name, `startedAt`, `center`, `bounds` (the pipeline's bounding box).
-- `timeline` — `startAt`/`endAt`/`cadenceHours` (a positive divisor of 24).
-- `app` — frontend presentation: `title`, `tagline`, `initialZoom`, `baseImagery`
+- `event`: id, name, `startedAt`, `center`, `bounds` (the pipeline's bounding box).
+- `timeline`: `startAt`/`endAt`/`cadenceHours` (a positive divisor of 24).
+- `app`: frontend presentation: `title`, `tagline`, `initialZoom`, `baseImagery`
   (`tiles`/`attribution`/`maxzoom`), and `simplifyToleranceMeters` (SAM-2 output).
-- `feeds` — per-feed observation lists, populated by the pipeline tools.
+- `feeds`: per-feed observation lists, populated by the pipeline tools.
 
 The `app` and `event` blocks are carried into `catalog.json`; the frontend reads them
 to brand the page, focus the map, and choose the base imagery. The ⋮ → **Settings**
-form edits `event`/`app`/`timeline` (never `feeds`) — see [development](development.md).
+form edits `event`/`app`/`timeline` (never `feeds`); see [development](development.md).
+
+## Two catalog producers, one contract
+
+The frontend consumes the same catalog shape from either producer:
+
+- **Static**: `tools/generate_catalog.js` expands the config into `dist/data/catalog.json`
+  at build time (the curated-fire path).
+- **Live**: `GET /api/catalog?fire=irwin:<id>` synthesizes a catalog on demand from NIFC
+  and FIRMS (see [Engine](engine.md)). The frontend selects it automatically when the URL
+  carries a `fire` parameter.
 
 ## Snapshot catalog
 

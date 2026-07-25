@@ -1,48 +1,27 @@
-# East Evans Creek Near-Real-Time Earth View
+# Wildfire Boundary Tracker
 
-Live map of the East Evans Creek fire (started July 10, 2026). Open it and it works: no setup, no configuration, no account.
+Live map of any current US wildfire. Pick a fire and it works: no setup, no configuration, no account.
 
-Coverage begins July 16: a NASA FIRMS VIIRS outage blocked reliable thermal data for the first six days of the fire.
+## Using it
 
-## Using the map
-
-- **Timeline**: scrub through three-hour snapshots from July 16 to July 22, press Play, change speed, or hit Live to follow the newest data.
-- **⋮ menu**: mission specifications and feed details; the dot on the button reflects feed health.
-- **3D button**: tilts the view onto a terrain surface built from real elevation data and the latest satellite pass.
+1. Open [fires.html](public/fires.html) (the landing page) to see current incidents from NIFC, searchable by name or state.
+2. Pick a fire. The map opens at `/?fire=irwin:<id>` and builds itself from live data.
+3. Scrub the three-hour timeline, press Play, or hit Live to follow the newest detections.
 
 ## What you're seeing
 
-- Sentinel-2 SWIR false-color imagery (cuts through smoke, highlights burn scars)
-- VIIRS thermal detections as an age-faded heat field
-- SAM-2 segmented fire body showing the progression envelope
-- Roads, county borders, city limits, and landscape features from OpenStreetMap
+- The fire list and initial footprint come from NIFC incident records
+- VIIRS thermal detections (NASA FIRMS) draw the heat field and grow the footprint as the fire spreads
+- The timeline runs from discovery (up to the 10-day FIRMS history limit) to now, in 3-hour frames
 
-Every layer comes from real observations; nothing is fabricated. The map updates itself as new data is published.
+Every layer comes from real observations; nothing is fabricated and nothing is stored. Each view is synthesized on demand from NIFC and FIRMS, with your fire shareable as a plain URL.
 
-The full specification for the fire currently in focus lives in [fire-specs.md](fire-specs.md).
-
-## Focus on a different fire
-
-This app is polymorphous: one deployment can be pointed at any fire by supplying its
-coordinates and timeline. When running locally (`npm run dev`):
-
-1. Frame the fire on the map, then open **⋮ → Settings**.
-2. Enter a name and the timeline, click **Use current map view** to capture the area, and **Save**.
-3. Save writes `public/data/catalog.config.json` and the map re-focuses immediately.
-4. Run the data pipeline (see [Development](docs/development.md)) for the new area so the
-   thermal, Sentinel, SAM-2, and terrain layers are regenerated to match.
-
-The same config file is the single source of truth for both the map and the pipeline.
-
-On the **deployed** site, **Save & rebuild** works for anyone: it calls a small Cloudflare
-Pages Function that fires a GitHub webhook to rebuild and redeploy with the new fire (no
-credentials ever touch the browser). Optionally gate it behind a passphrase. See
-[Deployment](docs/deployment.md). Either way, the map re-focuses immediately; the data
-layers appear once the pipeline has run for the new area.
+This project is a fork of [fire-progression-NRTDV](https://github.com/J-mazz/fire-progression-NRTDV), the curated East Evans Creek instance with Sentinel imagery, SAM-2 segmentation, and 3D terrain.
 
 ## Technical documentation
 
-- [Development](docs/development.md): local setup, WASM/C++26 build, terrain data, KML tooling, SAM-2 processing
-- [Data contract & pipeline](docs/data-contract.md): snapshot catalog format, layer semantics, pipeline boundary
-- [Deployment](docs/deployment.md): Cloudflare Pages build and CI
+- [Engine](docs/engine.md): API endpoints, data flow, footprint seeding and growth, caching
+- [Development](docs/development.md): local setup, WASM/C++26 build, tooling
+- [Data contract & pipeline](docs/data-contract.md): snapshot catalog format, layer semantics
+- [Deployment](docs/deployment.md): Cloudflare Pages build, Functions, and secrets
 

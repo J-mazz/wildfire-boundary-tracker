@@ -1,4 +1,4 @@
-# Fire spec sheet — East Evans Creek
+# Fire spec sheet: East Evans Creek
 
 The specification for the fire this deployment is currently focused on. Every value
 here is sourced from [`public/data/catalog.config.json`](public/data/catalog.config.json);
@@ -31,7 +31,7 @@ changes this sheet. Use it as the template for a new fire's spec sheet.
 | --- | --- |
 | Coverage window | 2026-07-16 09:00 UTC → 2026-07-22 21:00 UTC |
 | Snapshot cadence | Every 3 hours |
-| Coverage gap | 2026-07-10 → 2026-07-16 — a NASA FIRMS VIIRS availability outage prevented reliable thermal detections during the fire's first six days. Missing detections do **not** mean there was no fire. |
+| Coverage gap | 2026-07-10 → 2026-07-16: a NASA FIRMS VIIRS availability outage prevented reliable thermal detections during the fire's first six days. Missing detections do **not** mean there was no fire. |
 
 ## Feeds
 
@@ -46,7 +46,7 @@ changes this sheet. Use it as the template for a new fire's spec sheet.
 
 ## Base imagery
 
-Esri World Imagery (`server.arcgisonline.com`) — configured in `app.baseImagery`.
+Esri World Imagery (`server.arcgisonline.com`), configured in `app.baseImagery`.
 **Replace this public endpoint with your own tile source before significant traffic.**
 The deployed CSP (`dist/_headers`) is generated from this host at build time.
 
