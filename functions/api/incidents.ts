@@ -1,3 +1,5 @@
+import { upstreamJson, UpstreamError, waitUntil, withApiErrors } from './_http';
+
 interface NifcFeature {
   attributes?: Record<string, unknown>;
   geometry?: { x?: unknown; y?: unknown };
@@ -29,7 +31,7 @@ function optionalString(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
-export const onRequestGet: PagesFunction = async (context) => {
+export const onRequestGet = withApiErrors(async (context) => {
   const cache = caches.default;
   const cacheKey = new Request(new URL('/api/incidents', context.request.url).toString());
   const cached = await cache.match(cacheKey);
@@ -43,20 +45,17 @@ export const onRequestGet: PagesFunction = async (context) => {
     returnGeometry: 'true',
     f: 'json'
   });
-  const upstream = await fetch(`${UPSTREAM}?${query}`, { headers: { Accept: 'application/json' } });
-  if (!upstream.ok) {
-    return Response.json(
-      { error: `NIFC upstream returned ${upstream.status}` },
-      { status: 502, headers: { 'Cache-Control': 'no-store' } }
-    );
+  const value = await upstreamJson(
+    'NIFC incident service',
+    `${UPSTREAM}?${query}`,
+    { headers: { Accept: 'application/json' } }
+  );
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new UpstreamError('NIFC incident service', 'returned an unexpected shape');
   }
-
-  const body: NifcResponse = await upstream.json();
+  const body = value as NifcResponse;
   if (!Array.isArray(body.features)) {
-    return Response.json(
-      { error: 'NIFC upstream returned an unexpected shape.' },
-      { status: 502, headers: { 'Cache-Control': 'no-store' } }
-    );
+    throw new UpstreamError('NIFC incident service', 'returned invalid features');
   }
 
   const incidents = body.features.flatMap((feature) => {
@@ -82,6 +81,6 @@ export const onRequestGet: PagesFunction = async (context) => {
     { generatedAt: new Date().toISOString(), source: 'NIFC WFIGS', incidents },
     { headers: { 'Cache-Control': `public, max-age=${CACHE_SECONDS}` } }
   );
-  context.waitUntil(cache.put(cacheKey, response.clone()));
+  waitUntil(context, 'incidents_cache_put', cache.put(cacheKey, response.clone()));
   return response;
-};
+});

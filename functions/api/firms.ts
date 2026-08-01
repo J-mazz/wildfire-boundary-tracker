@@ -1,20 +1,21 @@
 import {
-  type Env,
   frameCacheRequest,
   frameResponse,
   fetchDetections,
   fetchIncident,
   parseFireParam,
-  seedFootprint
+  seedFootprint,
+  validFrameParam
 } from './_engine';
+import { waitUntil, withApiErrors } from './_http';
 
-export const onRequestGet: PagesFunction<Env> = async (context) => {
+export const onRequestGet = withApiErrors<Env>(async (context) => {
   const url = new URL(context.request.url);
   const irwinId = parseFireParam(url.searchParams.get('fire'));
   const frame = url.searchParams.get('frame');
   const days = Number(url.searchParams.get('days') ?? '10');
-  if (!irwinId || !frame || !/^\d{4}-\d{2}-\d{2}T\d{2}:00:00Z$/.test(frame)
-    || !Number.isInteger(days) || days < 1 || days > 10) {
+  if (!irwinId || !frame || !Number.isInteger(days) || days < 1 || days > 10
+    || !validFrameParam(frame, days)) {
     return Response.json({ error: 'Pass ?fire=irwin:<id>&frame=<iso frame start>&days=<1-10>.' }, { status: 400 });
   }
 
@@ -31,7 +32,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     seedFootprint(incident.center, incident.sizeAcres),
     days,
     cache,
-    (promise) => context.waitUntil(promise)
+    (promise, operation) => waitUntil(context, operation, promise)
   );
   if (!result.detections) {
     return Response.json({ error: result.reason }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
@@ -39,8 +40,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   const response = frameResponse(result.detections, frame);
   const body = await response.clone().json<{ features: unknown[] }>();
-  if (body.features.length === 0) return Response.json({ error: 'No detections in this frame.' }, { status: 404 });
+  if (body.features.length === 0) {
+    return Response.json({ error: 'No detections within the persistence window.' }, { status: 404 });
+  }
 
-  context.waitUntil(cache.put(cacheKey, response.clone()));
+  waitUntil(context, 'frame_cache_put', cache.put(cacheKey, response.clone()));
   return response;
-};
+});

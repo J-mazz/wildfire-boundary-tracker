@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 
 namespace {
 
@@ -84,11 +85,23 @@ bool parse_unsigned(const char* begin, const char* end, std::uint32_t& output) {
     std::uint32_t value = 0u;
     const char* cursor = begin;
     while (cursor < end && *cursor >= '0' && *cursor <= '9') {
-        value = value * 10u + static_cast<std::uint32_t>(*cursor++ - '0');
+        const auto digit = static_cast<std::uint32_t>(*cursor++ - '0');
+        if (value > (std::numeric_limits<std::uint32_t>::max() - digit) / 10u) return false;
+        value = value * 10u + digit;
     }
     if (cursor != end) return false;
     output = value;
     return true;
+}
+
+constexpr bool leap_year(const std::uint32_t year) noexcept {
+    return year % 4u == 0u && (year % 100u != 0u || year % 400u == 0u);
+}
+
+constexpr std::uint32_t days_in_month(const std::uint32_t year, const std::uint32_t month) noexcept {
+    constexpr std::uint32_t days[] = {31u, 28u, 31u, 30u, 31u, 30u, 31u, 31u, 30u, 31u, 30u, 31u};
+    if (month < 1u || month > 12u) return 0u;
+    return month == 2u && leap_year(year) ? 29u : days[month - 1u];
 }
 
 // Howard Hinnant's civil calendar transform, reduced to the Gregorian days needed here.
@@ -111,7 +124,7 @@ bool parse_observed_at(const Field date, const Field time, std::int64_t& output_
         || !parse_unsigned(time.begin, time.end, hhmm)) return false;
     const auto hour = hhmm / 100u;
     const auto minute = hhmm % 100u;
-    if (month < 1u || month > 12u || day < 1u || day > 31u || hour > 23u || minute > 59u) return false;
+    if (day < 1u || day > days_in_month(year, month) || hour > 23u || minute > 59u) return false;
     const auto seconds = days_from_civil(static_cast<int>(year), month, day) * 86400
         + static_cast<std::int64_t>(hour) * 3600 + static_cast<std::int64_t>(minute) * 60;
     output_ms = seconds * 1000;
@@ -249,6 +262,8 @@ int firms_ingest_csv(const std::uint32_t byte_length) {
             && static_cast<std::uint32_t>(columns.acq_time) < field_count
             && parse_double(fields[columns.latitude], latitude)
             && parse_double(fields[columns.longitude], longitude)
+            && latitude >= -90.0 && latitude <= 90.0
+            && longitude >= -180.0 && longitude <= 180.0
             && parse_observed_at(fields[columns.acq_date], fields[columns.acq_time], observed_at_ms)) {
             DetectionRecord& record = g_records[g_count++];
             std::memset(&record, 0, sizeof(record));

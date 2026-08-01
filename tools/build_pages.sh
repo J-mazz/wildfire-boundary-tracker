@@ -7,8 +7,8 @@ npm run build:wasm
 npm run build:worker-wasm
 SOURCE_MAPS=0 bash build.sh
 
-if find dist -type f \( -name '*.map' -o -name 'catalog.config.json' \) -print -quit | grep -q .; then
-  echo "Pages build contains private build metadata or source maps" >&2
+if find dist -type f -name '*.map' -print -quit | grep -q .; then
+  echo "Pages build contains source maps" >&2
   exit 1
 fi
 

@@ -1,7 +1,6 @@
 import { CatalogClient } from './network/CatalogClient';
 import { MapController } from './core/MapController';
 import { TimelineController } from './core/TimelineController';
-import { SettingsController } from './core/SettingsController';
 import type { FireBootstrap, Snapshot, SnapshotCatalog } from './types';
 import '../styles.css';
 
@@ -160,7 +159,9 @@ function renderSpecifications(snapshot: Snapshot): void {
   const summaries = [
     ...otherLayers.map((layer) => layer.label),
     ...(samLayers.length > 0 ? [`SAM-2 fire path (${sumFeatures(samLayers).toLocaleString()} polygons · ${samLayers.length} masks)`] : []),
-    ...(firmsLayers.length > 0 ? [`VIIRS thermal field (${sumFeatures(firmsLayers).toLocaleString()} detections · ${firmsLayers.length} passes)`] : [])
+    ...(firmsLayers.length > 0
+      ? [`VIIRS thermal field (${sumFeatures(firmsLayers).toLocaleString()} detections${firmsLayers.length > 1 ? ` · ${firmsLayers.length} passes` : ''})`]
+      : [])
   ];
   layersElement.textContent = readyLayers.length === 0
     ? 'Global satellite base'
@@ -234,7 +235,6 @@ function applyCatalog(nextCatalog: SnapshotCatalog, meta: { stale: boolean }): v
     && catalog.snapshots.length === nextCatalog.snapshots.length;
   catalog = nextCatalog;
   catalogStale = meta.stale;
-  settings.syncCatalog(nextCatalog);
   setStatus(meta.stale ? 'Cached catalog · update failed' : 'Catalog current', meta.stale ? 'error' : 'ready');
   if (!meta.stale) {
     errorElement.hidden = true;
@@ -265,5 +265,4 @@ function applyCatalog(nextCatalog: SnapshotCatalog, meta: { stale: boolean }): v
 mapController.onError(showError);
 
 const catalogClient = new CatalogClient(CATALOG_URL);
-const settings = new SettingsController(mapController, catalogClient);
 catalogClient.start(applyCatalog, (error) => showError(`Catalog update failed: ${error.message}`));

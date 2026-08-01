@@ -1,0 +1,21 @@
+/*
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://server.arcgisonline.com; connect-src 'self' https://server.arcgisonline.com https://tiles.openfreemap.org; font-src 'self'; worker-src 'self' blob:; child-src blob:
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/map.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/client.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/client.css
+  Cache-Control: public, max-age=0, must-revalidate
+
+/wasm/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800

@@ -57,16 +57,13 @@ The tracker does not include a Python inference backend or silently fall back fr
 
 ## Offline geospatial tools
 
-Python remains only for deterministic geospatial preparation such as Sentinel mosaics
-and DEM splats:
+Python remains only for deterministic geospatial preparation. Geosplat generation
+requires explicit bounds, source imagery, output directory, and public payload URL:
 
 ```bash
-uv run python tools/build_geosplat.py
-```
-
-Context KML conversion uses native C++26 and simdjson:
-
-```bash
-bash tools/install_simdjson_local.sh
-bash tools/fetch_context_kml.sh
+uv run python tools/build_geosplat.py \
+  --bounds WEST SOUTH EAST NORTH \
+  --sentinel PATH_TO_SENTINEL_IMAGE \
+  --output OUTPUT_DIRECTORY \
+  --public-url terrain.splat
 ```

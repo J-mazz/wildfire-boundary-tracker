@@ -4,22 +4,21 @@
   "version": "0.0.1",
   "scripts": {
     "build": "bash build.sh",
-    "build:native": "bash tools/build_native.sh",
     "build:ncnn": "bash tools/build_ncnn_vulkan.sh",
     "build:pages": "bash tools/build_pages.sh",
     "build:wasm": "bash tools/build_wasm.sh",
     "build:worker-wasm": "bash tools/build_worker_wasm.sh",
     "deploy:pages": "npm run build:pages && wrangler pages deploy dist --project-name wildfire-boundary-tracker --branch main",
     "dev": "npm run build:pages && wrangler pages dev dist --env-file .env.local",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.functions.json",
-    "test": "npm run build:wasm && npm run build:worker-wasm && npm run typecheck && node tests/run_tracker_tests.cjs"
+    "types": "wrangler types --env-file .dev.vars.example",
+    "typecheck": "wrangler types --env-file .dev.vars.example --check && tsc --noEmit && tsc -p tsconfig.functions.json",
+    "test": "npm run build:pages && npm run typecheck && node tests/run_tracker_tests.cjs"
   },
   "dependencies": {
     "@tmcw/togeojson": "^7.1.2",
     "maplibre-gl": "^5.24.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260724.1",
     "esbuild": "^0.28.1",
     "typescript": "^7.0.2",
     "wrangler": "^4.114.0"

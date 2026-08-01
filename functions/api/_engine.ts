@@ -1,8 +1,12 @@
 import firmsEngineModule from '../wasm/firms_engine.wasm';
+import { fetchUpstream, logDegraded, upstreamJson, UpstreamError } from './_http';
 
 const NIFC_QUERY =
   'https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/' +
   'WFIGS_Incident_Locations_Current/FeatureServer/0/query';
+const NIFC_PERIMETER_QUERY =
+  'https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/' +
+  'WFIGS_Interagency_Perimeters_Current/FeatureServer/0/query';
 const FIRMS_AREA = 'https://firms.modaps.eosdis.nasa.gov/api/area/csv';
 const FIRMS_SOURCES = ['VIIRS_SNPP_NRT', 'VIIRS_NOAA20_NRT', 'VIIRS_NOAA21_NRT'] as const;
 
@@ -15,12 +19,15 @@ const BATCH_DAYS = 4;
 const MAX_HISTORY_DAYS = 10;
 const RECORD_STRIDE = 64;
 export const FRAME_CACHE_SECONDS = 1800;
+export const PERIMETER_CACHE_SECONDS = 300;
+/**
+ * VIIRS passes a given point only a few times a day, so a frame holding just its own
+ * pass is empty far more often than not. Detections persist for a week and fade with
+ * age instead, which is what the renderer's age ramps are built to draw.
+ */
+export const PERSISTENCE_HOURS = 168;
 
 export type Bounds = [west: number, south: number, east: number, north: number];
-
-export interface Env {
-  FIRMS_MAP_KEY?: string;
-}
 
 export interface Incident {
   irwinId: string;
@@ -55,6 +62,12 @@ export interface PointFeature {
   type: 'Feature';
   properties: Record<string, unknown>;
   geometry: { type: 'Point'; coordinates: [number, number] };
+}
+
+export interface PerimeterResult {
+  collection: Record<string, unknown> & { type: 'FeatureCollection'; features: unknown[] };
+  featureCount: number;
+  observedAt: string | null;
 }
 
 interface FirmsExports extends WebAssembly.Exports {
@@ -92,6 +105,8 @@ interface BatchFetch {
   fromCache: boolean;
   failure: string | null;
 }
+
+export type Defer = (promise: Promise<unknown>, operation: string) => void;
 
 function createEngine(): FirmsExports {
   const exports = new WebAssembly.Instance(firmsEngineModule, {}).exports;
@@ -131,9 +146,18 @@ export async function fetchIncident(irwinId: string): Promise<Incident | null> {
     resultRecordCount: '1',
     f: 'json'
   });
-  const response = await fetch(`${NIFC_QUERY}?${query}`, { headers: { Accept: 'application/json' } });
-  if (!response.ok) throw new Error(`NIFC upstream returned ${response.status}`);
-  const body: NifcResponse = await response.json();
+  const value = await upstreamJson(
+    'NIFC incident service',
+    `${NIFC_QUERY}?${query}`,
+    { headers: { Accept: 'application/json' } }
+  );
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new UpstreamError('NIFC incident service', 'returned an unexpected shape');
+  }
+  const body = value as NifcResponse;
+  if (body.features !== undefined && !Array.isArray(body.features)) {
+    throw new UpstreamError('NIFC incident service', 'returned invalid features');
+  }
   const feature = body.features?.[0];
   const longitude = finiteNumber(feature?.geometry?.x);
   const latitude = finiteNumber(feature?.geometry?.y);
@@ -149,6 +173,42 @@ export async function fetchIncident(irwinId: string): Promise<Incident | null> {
     percentContained: finiteNumber(attributes.PercentContained),
     state: stringValue(attributes.POOState),
     center: [longitude, latitude]
+  };
+}
+
+export async function fetchCurrentPerimeter(irwinId: string): Promise<PerimeterResult | null> {
+  const normalizedId = irwinId.replace(/[{}]/g, '').toUpperCase();
+  const query = new URLSearchParams({
+    where: `poly_IRWINID = '{${normalizedId}}'`,
+    outFields: 'poly_IncidentName,poly_GISAcres,poly_PolygonDateTime,poly_MapMethod,poly_Source',
+    returnGeometry: 'true',
+    outSR: '4326',
+    f: 'geojson'
+  });
+  const value = await upstreamJson('NIFC perimeter service', `${NIFC_PERIMETER_QUERY}?${query}`, {
+    headers: { Accept: 'application/geo+json, application/json' }
+  });
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new UpstreamError('NIFC perimeter service', 'returned an unexpected shape');
+  }
+  const collection = value as Record<string, unknown>;
+  if (collection.type !== 'FeatureCollection' || !Array.isArray(collection.features)) {
+    throw new UpstreamError('NIFC perimeter service', 'returned invalid GeoJSON');
+  }
+  if (collection.features.length === 0) return null;
+
+  let newestTimestamp = Number.NEGATIVE_INFINITY;
+  for (const feature of collection.features) {
+    if (typeof feature !== 'object' || feature === null || Array.isArray(feature)) continue;
+    const properties = (feature as Record<string, unknown>).properties;
+    if (typeof properties !== 'object' || properties === null || Array.isArray(properties)) continue;
+    const timestamp = finiteNumber((properties as Record<string, unknown>).poly_PolygonDateTime);
+    if (timestamp !== null) newestTimestamp = Math.max(newestTimestamp, timestamp);
+  }
+  return {
+    collection: collection as PerimeterResult['collection'],
+    featureCount: collection.features.length,
+    observedAt: Number.isFinite(newestTimestamp) ? new Date(newestTimestamp).toISOString() : null
   };
 }
 
@@ -233,16 +293,9 @@ async function fetchBatch(
     if (cached) return { batch, cacheKey, response: cached, fromCache: true, failure: null };
 
     const upstreamUrl = `${FIRMS_AREA}/${env.FIRMS_MAP_KEY}/${source}/${area}/${batch.length}/${batch.start}`;
-    const response = await fetch(upstreamUrl, { headers: { Accept: 'text/csv' } });
-    if (!response.ok) {
-      return {
-        batch,
-        cacheKey,
-        response: null,
-        fromCache: false,
-        failure: `${source} returned HTTP ${response.status}`
-      };
-    }
+    const response = await fetchUpstream(`NASA FIRMS ${source}`, upstreamUrl, {
+      headers: { Accept: 'text/csv' }
+    });
     return { batch, cacheKey, response, fromCache: false, failure: null };
   } catch (error) {
     return {
@@ -297,7 +350,7 @@ export async function fetchDetections(
   bounds: Bounds,
   dayRange: number,
   cache: Cache | null,
-  defer: (promise: Promise<unknown>) => void,
+  defer: Defer,
   now = new Date()
 ): Promise<DetectionResult> {
   if (!env.FIRMS_MAP_KEY) {
@@ -327,17 +380,21 @@ export async function fetchDetections(
         const cached = new Response(cacheCopy.body, {
           headers: { 'Content-Type': 'text/csv', 'Cache-Control': `public, max-age=${item.batch.ttl}` }
         });
-        defer(cache.put(item.cacheKey, cached));
+        defer(cache.put(item.cacheKey, cached), 'firms_batch_cache_put');
       }
     } catch (error) {
       failures.push(error instanceof Error ? error.message : String(error));
-      if (cache && item.fromCache) defer(cache.delete(item.cacheKey));
+      if (cache && item.fromCache) defer(cache.delete(item.cacheKey), 'firms_batch_cache_delete');
     }
   }
 
   if (successfulBatches === 0 && engine.firms_count() === 0) {
-    const detail = failures[0] ? `: ${failures[0]}` : '';
-    return { detections: null, bounds, reason: `NASA FIRMS is temporarily unavailable${detail}` };
+    if (failures.length > 0) logDegraded('firms_fetch_failed', failures[0], { failureCount: failures.length });
+    return { detections: null, bounds, reason: 'NASA FIRMS is temporarily unavailable.' };
+  }
+
+  if (failures.length > 0) {
+    logDegraded('firms_fetch_degraded', failures[0], { failureCount: failures.length, batchCount: fetched.length });
   }
 
   engine.firms_finalize(...bounds, PADDING_DEGREES, MAX_SPAN_DEGREES);
@@ -360,12 +417,41 @@ export function frameOf(iso: string, cadenceHours = CADENCE_HOURS): string {
   return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
-export function toFrameFeatures(rows: Detection[], frameIso: string): PointFeature[] {
+export function validFrameParam(frame: string, days: number, now = new Date()): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:00:00Z$/.test(frame)) return false;
+  const frameMs = Date.parse(frame);
+  if (!Number.isFinite(frameMs) || new Date(frameMs).getUTCHours() % CADENCE_HOURS !== 0) return false;
+  const latestFrameMs = Date.parse(frameOf(now.toISOString()));
+  const earliestFrameMs = latestFrameMs - days * 86_400_000;
+  return frameMs >= earliestFrameMs && frameMs <= latestFrameMs;
+}
+
+/** Start of the cadence bucket containing `observedAtMs`. */
+export function frameStartMs(observedAtMs: number, cadenceHours = CADENCE_HOURS): number {
+  const date = new Date(observedAtMs);
+  date.setUTCHours(Math.floor(date.getUTCHours() / cadenceHours) * cadenceHours, 0, 0, 0);
+  return date.getTime();
+}
+
+/**
+ * Everything still visible at `frameIso`: the frame's own pass plus earlier detections
+ * inside the persistence window, each carrying the age the renderer fades against.
+ */
+export function toFrameFeatures(
+  rows: Detection[],
+  frameIso: string,
+  persistenceHours = PERSISTENCE_HOURS
+): PointFeature[] {
+  const frameMs = Date.parse(frameIso);
+  const windowMs = persistenceHours * 3_600_000;
   return rows.flatMap((row): PointFeature[] => {
-    const observedAt = observedAtOf(row);
-    if (frameOf(observedAt) !== frameIso) return [];
+    if (frameStartMs(row.observedAtMs) > frameMs) return [];
+    const ageMs = frameMs - row.observedAtMs;
+    if (ageMs > windowMs) return [];
     const properties: Record<string, unknown> = {
-      observedAt,
+      observedAt: observedAtOf(row),
+      // Detections inside the frame's own bucket are the live edge: age zero.
+      ageHours: Math.round(Math.max(0, ageMs) / 36_000) / 100,
       satellite: row.satellite,
       instrument: row.instrument,
       confidence: row.confidence,
@@ -382,16 +468,60 @@ export function toFrameFeatures(rows: Detection[], frameIso: string): PointFeatu
   });
 }
 
+export interface FrameCoverage {
+  featureCount: number;
+  newestObservedAt: string | null;
+}
+
+/**
+ * Window occupancy for each frame in `frameTimes` (ascending). Both window edges only
+ * ever advance, so the whole timeline costs one pass instead of a scan per frame.
+ */
+export function frameCoverage(
+  rows: Detection[],
+  frameTimes: number[],
+  persistenceHours = PERSISTENCE_HOURS
+): FrameCoverage[] {
+  const windowMs = persistenceHours * 3_600_000;
+  const sorted = [...rows].sort((left, right) => left.observedAtMs - right.observedAtMs);
+  const coverage: FrameCoverage[] = [];
+  let head = 0;
+  let tail = 0;
+  for (const frameMs of frameTimes) {
+    while (head < sorted.length && frameStartMs(sorted[head]!.observedAtMs) <= frameMs) ++head;
+    while (tail < head && frameMs - sorted[tail]!.observedAtMs > windowMs) ++tail;
+    coverage.push({
+      featureCount: head - tail,
+      newestObservedAt: head > tail ? observedAtOf(sorted[head - 1]!) : null
+    });
+  }
+  return coverage;
+}
+
 export function frameCacheRequest(irwinId: string, frameIso: string, days: number): Request {
   return new Request(`https://firms-frame-cache.internal/${irwinId.toLowerCase()}/${frameIso}/${days}`);
 }
 
-export function frameResponse(rows: Detection[], frameIso: string): Response {
+export function perimeterCacheRequest(irwinId: string): Request {
+  return new Request(`https://perimeter-cache.internal/${irwinId.toLowerCase()}`);
+}
+
+export function perimeterResponse(result: PerimeterResult): Response {
+  return Response.json(result.collection, {
+    headers: { 'Cache-Control': `public, max-age=${PERIMETER_CACHE_SECONDS}` }
+  });
+}
+
+export function frameResponse(
+  rows: Detection[],
+  frameIso: string,
+  persistenceHours = PERSISTENCE_HOURS
+): Response {
   return Response.json(
     {
       type: 'FeatureCollection',
-      properties: { observedAt: frameIso, source: 'NASA FIRMS VIIRS' },
-      features: toFrameFeatures(rows, frameIso)
+      properties: { observedAt: frameIso, source: 'NASA FIRMS VIIRS', persistenceHours },
+      features: toFrameFeatures(rows, frameIso, persistenceHours)
     },
     { headers: { 'Cache-Control': `public, max-age=${FRAME_CACHE_SECONDS}` } }
   );

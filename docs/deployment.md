@@ -6,9 +6,8 @@ npm run deploy:pages
 ```
 
 The production build strips source maps, bundles the WASM artifacts, validates Pages file
-limits, scans output for local secret values, and generates `dist/_headers` from
-`public/_headers.template` with the configured imagery origin (CSP includes
-`wasm-unsafe-eval`).
+limits, scans output for local secret values, and publishes the security policy from
+`public/_headers`.
 
 `.github/workflows/deploy-pages.yml` validates pull requests and deploys pushes to `main`.
 Required GitHub configuration:
@@ -28,3 +27,7 @@ wrangler pages secret put FIRMS_MAP_KEY --project-name <project>
 
 Without it the site still works: the landing page and catalogs load from NIFC, and each
 frame reports that FIRMS is unconfigured.
+
+Copy `.dev.vars.example` to `.env.local` for local development. `npm run typecheck`
+also verifies that `worker-configuration.d.ts` still matches `wrangler.jsonc` and the
+example binding environment.

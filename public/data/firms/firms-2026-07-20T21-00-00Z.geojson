@@ -1,1 +1,0 @@
-{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"observedAt":"2026-07-20T21:55:00Z","satellite":"N20","instrument":"VIIRS","confidence":"n","frpMw":4.63,"brightnessI4K":330.12,"brightnessI5K":285.47,"dayNight":"D","scanKm":0.35,"trackKm":0.56},"geometry":{"type":"Point","coordinates":[-122.88525,42.59209]}}]}

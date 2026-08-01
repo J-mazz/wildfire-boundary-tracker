@@ -4,7 +4,6 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ES2022"],
-    "types": ["@cloudflare/workers-types"],
     "strict": true,
     "noImplicitAny": true,
     "noUncheckedIndexedAccess": true,
@@ -13,5 +12,5 @@
     "noEmit": true,
     "allowArbitraryExtensions": true
   },
-  "include": ["functions/**/*.ts", "functions/**/*.d.ts"]
+  "include": ["worker-configuration.d.ts", "functions/**/*.ts", "functions/**/*.d.ts"]
 }

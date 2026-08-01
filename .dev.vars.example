@@ -1,0 +1,2 @@
+# Copy to .env.local for `npm run dev`, then replace the value.
+FIRMS_MAP_KEY=replace-with-your-nasa-firms-map-key

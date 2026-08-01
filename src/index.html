@@ -25,101 +25,13 @@
       <span id="connection-status" class="status" data-state="loading">Connecting</span>
     </div>
 
-    <div class="panel-tabs" role="tablist" aria-label="Panel view">
-      <button id="tab-specs" class="panel-tab" type="button" role="tab"
-              aria-selected="true" aria-controls="specs-view">Details</button>
-      <button id="tab-settings" class="panel-tab" type="button" role="tab"
-              aria-selected="false" aria-controls="settings-view">Settings</button>
-    </div>
-
-    <div id="specs-view" role="tabpanel" aria-labelledby="tab-specs">
-      <dl class="spec-grid">
-        <div><dt>Observed</dt><dd id="spec-observed">—</dd></div>
-        <div><dt>Freshness</dt><dd id="spec-freshness">—</dd></div>
-        <div><dt>Layers</dt><dd id="spec-layers">Global satellite base</dd></div>
-        <div><dt>Pipeline</dt><dd id="spec-pipeline">Loading catalog</dd></div>
-        <div class="spec-grid__wide"><dt>Data cadence</dt><dd id="spec-source">FIRMS 3h · Sentinel acquisition-driven</dd></div>
-      </dl>
-    </div>
-
-    <form id="settings-view" class="settings-form" role="tabpanel" aria-labelledby="tab-settings" hidden>
-      <p class="settings-form__intro">Point this map at a different fire. Enter the basics below, then run the data pipeline for the new area.</p>
-
-      <label class="field">
-        <span class="field__label">Fire name</span>
-        <input id="set-title" type="text" autocomplete="off" placeholder="e.g. Incident name" required>
-      </label>
-      <label class="field">
-        <span class="field__label">Subtitle</span>
-        <input id="set-tagline" type="text" autocomplete="off" placeholder="Near-real-time earth view">
-      </label>
-
-      <fieldset class="field">
-        <legend class="field__label">Fire area</legend>
-        <p id="set-area-summary" class="field__summary">—</p>
-        <button id="set-use-view" type="button" class="settings-form__ghost">Use current map view</button>
-        <span class="field__help">Pan and zoom the map to frame the fire, then click to capture it.</span>
-      </fieldset>
-
-      <div class="field field--split">
-        <label class="field">
-          <span class="field__label">Start (UTC)</span>
-          <input id="set-start" type="datetime-local" required>
-        </label>
-        <label class="field">
-          <span class="field__label">End (UTC)</span>
-          <input id="set-end" type="datetime-local" required>
-        </label>
-      </div>
-      <label class="field">
-        <span class="field__label">Snapshot every</span>
-        <select id="set-cadence">
-          <option value="1">1 hour</option>
-          <option value="2">2 hours</option>
-          <option value="3" selected>3 hours</option>
-          <option value="4">4 hours</option>
-          <option value="6">6 hours</option>
-          <option value="8">8 hours</option>
-          <option value="12">12 hours</option>
-          <option value="24">24 hours</option>
-        </select>
-      </label>
-
-      <details class="settings-advanced">
-        <summary>Advanced</summary>
-        <div class="field field--split">
-          <label class="field"><span class="field__label">Center lon</span><input id="set-center-lng" type="number" step="any"></label>
-          <label class="field"><span class="field__label">Center lat</span><input id="set-center-lat" type="number" step="any"></label>
-        </div>
-        <div class="field field--split">
-          <label class="field"><span class="field__label">West</span><input id="set-west" type="number" step="any"></label>
-          <label class="field"><span class="field__label">South</span><input id="set-south" type="number" step="any"></label>
-        </div>
-        <div class="field field--split">
-          <label class="field"><span class="field__label">East</span><input id="set-east" type="number" step="any"></label>
-          <label class="field"><span class="field__label">North</span><input id="set-north" type="number" step="any"></label>
-        </div>
-        <label class="field">
-          <span class="field__label">Initial zoom</span>
-          <input id="set-zoom" type="number" step="any" min="1" max="18">
-        </label>
-        <label class="field">
-          <span class="field__label">Base map tile URL</span>
-          <input id="set-base-url" type="text" autocomplete="off" placeholder="https://…/{z}/{y}/{x}">
-        </label>
-        <label class="field">
-          <span class="field__label">Base map credit</span>
-          <input id="set-base-attr" type="text" autocomplete="off">
-        </label>
-      </details>
-
-      <div class="settings-form__actions">
-        <button id="set-save" type="submit" class="settings-form__primary">Save</button>
-        <button id="set-copy" type="button" class="settings-form__ghost">Copy config JSON</button>
-        <button id="set-reset" type="button" class="settings-form__ghost">Reset</button>
-      </div>
-      <p id="settings-status" class="settings-form__status" role="status" hidden></p>
-    </form>
+    <dl class="spec-grid">
+      <div><dt>Observed</dt><dd id="spec-observed">—</dd></div>
+      <div><dt>Freshness</dt><dd id="spec-freshness">—</dd></div>
+      <div><dt>Layers</dt><dd id="spec-layers">Global satellite base</dd></div>
+      <div><dt>Pipeline</dt><dd id="spec-pipeline">Loading catalog</dd></div>
+      <div class="spec-grid__wide"><dt>Data cadence</dt><dd id="spec-source">FIRMS 3h · Sentinel acquisition-driven</dd></div>
+    </dl>
 
     <p id="error-message" class="error" role="alert" hidden></p>
   </section>

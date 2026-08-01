@@ -42,9 +42,10 @@ DEM_URL = (
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", type=Path, default=Path("public/data/catalog.config.json"))
-    parser.add_argument("--output", type=Path, default=Path("public/data/geosplat"))
-    parser.add_argument("--sentinel-dir", type=Path, default=Path("public/data/sentinel"))
+    parser.add_argument("--bounds", type=float, nargs=4, metavar=("WEST", "SOUTH", "EAST", "NORTH"), required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--sentinel", type=Path, required=True)
+    parser.add_argument("--public-url", default="terrain.splat")
     parser.add_argument("--grid", type=int, default=512)
     return parser.parse_args()
 
@@ -92,19 +93,21 @@ def surface_normals(heights, bounds, grid):
     return normals
 
 
-def latest_sentinel_rgb(sentinel_dir, grid):
-    candidates = sorted(sentinel_dir.glob("sentinel-swir-*.png"))
-    if not candidates:
-        raise RuntimeError(f"No Sentinel composite found in {sentinel_dir}")
-    source = candidates[-1]
+def sentinel_rgb(source, grid):
+    if not source.is_file():
+        raise RuntimeError(f"Sentinel composite not found: {source}")
     image = Image.open(source).convert("RGB").resize((grid, grid), Image.Resampling.LANCZOS)
     return np.asarray(image, dtype=np.uint8), source.name
 
 
 def main():
     args = parse_args()
-    config = json.loads(args.config.read_text())
-    bounds = config["event"]["bounds"]
+    bounds = args.bounds
+    west, south, east, north = bounds
+    if not (-180 <= west < east <= 180 and -90 <= south < north <= 90):
+        raise ValueError("--bounds must be valid WGS84 west south east north coordinates")
+    if args.grid < 2 or args.grid > 4096:
+        raise ValueError("--grid must be between 2 and 4096")
     grid = args.grid
 
     print(f"Reading Copernicus GLO-30 DEM for bounds {bounds} at {grid}x{grid}...")
@@ -117,7 +120,7 @@ def main():
     normals = surface_normals(heights, bounds, grid)
     normal_xy = np.clip(np.round(normals[..., :2] * 127.0), -127, 127).astype(np.int8)
 
-    rgb, sentinel_name = latest_sentinel_rgb(args.sentinel_dir, grid)
+    rgb, sentinel_name = sentinel_rgb(args.sentinel, grid)
 
     args.output.mkdir(parents=True, exist_ok=True)
     splat_path = args.output / "terrain.splat"
@@ -134,7 +137,7 @@ def main():
         "grid": [grid, grid],
         "minHeightMeters": round(min_h, 2),
         "maxHeightMeters": round(max_h, 2),
-        "url": "./data/geosplat/terrain.splat",
+        "url": args.public_url,
         "colorSource": sentinel_name,
         "demSource": "Copernicus GLO-30 DSM via AWS Open Data",
         "generatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),

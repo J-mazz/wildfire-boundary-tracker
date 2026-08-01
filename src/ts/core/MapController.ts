@@ -3,6 +3,7 @@ import { kml } from '@tmcw/togeojson';
 import type { Feature, FeatureCollection, Geometry, GeoJsonProperties } from 'geojson';
 import { GeosplatLayer } from './GeosplatLayer';
 import type { BaseImagery, Bounds, EventConfiguration, FireBootstrap, Snapshot, SnapshotLayer } from '../types';
+import { fetchWithTimeout } from '../network/fetch';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 const BASE_SOURCE = 'world-imagery';
@@ -31,6 +32,7 @@ const OPERATIONAL_LAYERS = [
   ...CONTEXT_LABEL_LAYERS,
   'operational-fill', 'operational-line', 'operational-points'
 ];
+const MAX_VECTOR_CACHE_ENTRIES = 96;
 
 export class MapController {
   private readonly map: maplibregl.Map;
@@ -179,7 +181,9 @@ export class MapController {
   prefetchSnapshot(snapshot: Snapshot): void {
     for (const layer of snapshot.layers) {
       if (layer.status === 'ready' && layer.url && layer.kind !== 'sentinel-raster') {
-        void this.loadVectorData(layer).catch(() => undefined);
+        void this.loadVectorData(layer).catch((error) => {
+          console.warn('Layer prefetch failed.', { layerId: layer.id, error });
+        });
       }
     }
   }
@@ -191,8 +195,11 @@ export class MapController {
       return false;
     }
     if (enabled && !this.geosplat) {
-      this.geosplatLoading ??= GeosplatLayer.load(this.terrainMetadataUrl!, this.errorHandler);
-      this.geosplat = await this.geosplatLoading;
+      const metadataUrl = this.terrainMetadataUrl!;
+      this.geosplatLoading ??= GeosplatLayer.load(metadataUrl, this.errorHandler);
+      const loaded = await this.geosplatLoading;
+      if (metadataUrl !== this.terrainMetadataUrl) return false;
+      this.geosplat = loaded;
       if (!this.geosplat) return false;
       const beforeId = CONTEXT_LINE_LAYERS.find((id) => this.map.getLayer(id));
       this.map.addLayer(this.geosplat, beforeId);
@@ -209,11 +216,12 @@ export class MapController {
 
   setTerrainMetadataUrl(metadataUrl: string | null): void {
     if (metadataUrl === this.terrainMetadataUrl) return;
+    if (this.geosplat && this.map.getLayer(this.geosplat.id)) this.map.removeLayer(this.geosplat.id);
+    this.geosplat = null;
     this.terrainMetadataUrl = metadataUrl;
     this.geosplatLoading = null;
     if (!metadataUrl) {
       this.terrainMode = false;
-      this.geosplat?.setEnabled(false);
       this.map.easeTo({ pitch: 0, duration: 0 });
     }
   }
@@ -426,11 +434,14 @@ export class MapController {
       const layer = layers[index]!;
       for (const feature of collection.features) {
         if (!feature.geometry) continue;
+        // A windowed feed ages each detection individually; a per-observation layer
+        // carries one age for all of its features.
+        const featureAge = feature.properties?.ageHours;
         features.push({
           ...feature,
           properties: {
             ...(feature.properties ?? {}),
-            ageHours: layer.ageHours ?? 0,
+            ageHours: typeof featureAge === 'number' ? featureAge : layer.ageHours ?? 0,
             contextType: layer.contextType,
             sourceObservedAt: layer.sourceObservedAt,
             sourceLayerId: layer.id
@@ -445,7 +456,7 @@ export class MapController {
     if (!layer.url) return Promise.resolve(EMPTY_COLLECTION);
     const cached = this.dataCache.get(layer.url);
     if (cached) return cached;
-    const pending = fetch(layer.url, { cache: 'no-cache' })
+    const pending = fetchWithTimeout(layer.url, { cache: 'no-cache' })
       .then(async (response) => {
         if (!response.ok) throw new Error(`Layer request returned ${response.status}: ${layer.url}`);
         if (layer.kind === 'kml' || layer.format === 'kml') {
@@ -457,12 +468,22 @@ export class MapController {
             features: converted.features.filter((feature) => feature.geometry !== null)
           } as FeatureCollection;
         }
-        return response.json() as Promise<FeatureCollection>;
+        const value: unknown = await response.json();
+        if (typeof value !== 'object' || value === null || Array.isArray(value)
+          || (value as Record<string, unknown>).type !== 'FeatureCollection'
+          || !Array.isArray((value as Record<string, unknown>).features)) {
+          throw new Error(`Invalid GeoJSON feature collection: ${layer.url}`);
+        }
+        return value as FeatureCollection;
       })
       .catch((error) => {
         this.dataCache.delete(layer.url!);
         throw error;
       });
+    if (this.dataCache.size >= MAX_VECTOR_CACHE_ENTRIES) {
+      const oldest = this.dataCache.keys().next().value;
+      if (typeof oldest === 'string') this.dataCache.delete(oldest);
+    }
     this.dataCache.set(layer.url, pending);
     return pending;
   }

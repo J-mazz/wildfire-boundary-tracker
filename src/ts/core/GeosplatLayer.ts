@@ -1,5 +1,6 @@
 import maplibregl from 'maplibre-gl';
 import type { CustomLayerInterface, CustomRenderMethodInput } from 'maplibre-gl';
+import { fetchWithTimeout } from '../network/fetch';
 
 interface GeosplatMeta {
   bounds: [number, number, number, number];
@@ -76,19 +77,41 @@ function compileProgram(gl: WebGL2RenderingContext): WebGLProgram {
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-      throw new Error(`Geosplat shader compile failed: ${gl.getShaderInfoLog(shader) ?? 'unknown'}`);
+      const message = gl.getShaderInfoLog(shader) ?? 'unknown';
+      gl.deleteShader(shader);
+      throw new Error(`Geosplat shader compile failed: ${message}`);
     }
     return shader;
   };
   const program = gl.createProgram();
   if (!program) throw new Error('Failed to create geosplat program.');
-  gl.attachShader(program, compile(gl.VERTEX_SHADER, VERTEX_SHADER));
-  gl.attachShader(program, compile(gl.FRAGMENT_SHADER, FRAGMENT_SHADER));
-  gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    throw new Error(`Geosplat program link failed: ${gl.getProgramInfoLog(program) ?? 'unknown'}`);
+  const shaders: WebGLShader[] = [];
+  try {
+    shaders.push(compile(gl.VERTEX_SHADER, VERTEX_SHADER));
+    shaders.push(compile(gl.FRAGMENT_SHADER, FRAGMENT_SHADER));
+    for (const shader of shaders) gl.attachShader(program, shader);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      throw new Error(`Geosplat program link failed: ${gl.getProgramInfoLog(program) ?? 'unknown'}`);
+    }
+  } catch (error) {
+    gl.deleteProgram(program);
+    throw error;
+  } finally {
+    for (const shader of shaders) gl.deleteShader(shader);
   }
   return program;
+}
+
+function validMeta(value: unknown): value is GeosplatMeta {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const meta = value as Record<string, unknown>;
+  return Array.isArray(meta.bounds) && meta.bounds.length === 4 && meta.bounds.every(Number.isFinite)
+    && Array.isArray(meta.grid) && meta.grid.length === 2
+    && meta.grid.every((entry) => typeof entry === 'number' && Number.isInteger(entry) && entry > 0)
+    && typeof meta.minHeightMeters === 'number' && Number.isFinite(meta.minHeightMeters)
+    && typeof meta.maxHeightMeters === 'number' && Number.isFinite(meta.maxHeightMeters)
+    && typeof meta.url === 'string' && meta.url.length > 0;
 }
 
 export class GeosplatLayer implements CustomLayerInterface {
@@ -101,6 +124,7 @@ export class GeosplatLayer implements CustomLayerInterface {
   private map: maplibregl.Map | null = null;
   private program: WebGLProgram | null = null;
   private vao: WebGLVertexArrayObject | null = null;
+  private buffers: WebGLBuffer[] = [];
   private instanceCount = 0;
   private uniforms: Record<string, WebGLUniformLocation | null> = {};
   private mercOrigin: [number, number] = [0, 0];
@@ -119,16 +143,17 @@ export class GeosplatLayer implements CustomLayerInterface {
   static async load(metadataUrl: string, onError: (message: string) => void): Promise<GeosplatLayer | null> {
     try {
       const resolvedMetadataUrl = new URL(metadataUrl, window.location.href);
-      const metaResponse = await fetch(resolvedMetadataUrl, { cache: 'no-cache' });
+      const metaResponse = await fetchWithTimeout(resolvedMetadataUrl, { cache: 'no-cache' });
       if (!metaResponse.ok) throw new Error(`Geosplat metadata returned ${metaResponse.status}.`);
-      const meta = (await metaResponse.json()) as GeosplatMeta;
+      const meta: unknown = await metaResponse.json();
+      if (!validMeta(meta)) throw new Error('Geosplat metadata is invalid.');
       const payloadUrl = new URL(meta.url, resolvedMetadataUrl);
 
       // Resolved at runtime relative to the bundle; the module ships as a static asset.
       const wasmSpecifier = './wasm/wildfire.js';
       const [factory, payload] = await Promise.all([
         import(wasmSpecifier).then((module) => module.default as () => Promise<unknown>),
-        fetch(payloadUrl, { cache: 'no-cache' }).then(async (response) => {
+        fetchWithTimeout(payloadUrl, { cache: 'no-cache' }).then(async (response) => {
           if (!response.ok) throw new Error(`Geosplat payload returned ${response.status}.`);
           return new Uint8Array(await response.arrayBuffer());
         })
@@ -137,16 +162,24 @@ export class GeosplatLayer implements CustomLayerInterface {
 
       const ptr = wasm._ext_allocate_wasm_buffer(payload.byteLength);
       if (ptr === 0) throw new Error('WASM allocation for geosplat payload failed.');
-      wasm.HEAPU8.set(payload, ptr);
-      const count = wasm._geosplat_decode(ptr, payload.byteLength);
-      wasm._ext_free_wasm_buffer(ptr);
+      let count = 0;
+      try {
+        wasm.HEAPU8.set(payload, ptr);
+        count = wasm._geosplat_decode(ptr, payload.byteLength);
+      } finally {
+        wasm._ext_free_wasm_buffer(ptr);
+      }
       if (count === 0) throw new Error('Geosplat payload failed to decode.');
 
       const floatsPerSplat = wasm._geosplat_floats_per_splat();
       const dataPtr = wasm._geosplat_data();
-      const view = new Float32Array(wasm.HEAPU8.buffer, dataPtr, count * floatsPerSplat);
-      const instances = view.slice();
-      wasm._geosplat_release();
+      let instances: Float32Array;
+      try {
+        const view = new Float32Array(wasm.HEAPU8.buffer, dataPtr, count * floatsPerSplat);
+        instances = view.slice();
+      } finally {
+        wasm._geosplat_release();
+      }
 
       return new GeosplatLayer(meta, instances, floatsPerSplat);
     } catch (error) {
@@ -178,6 +211,8 @@ export class GeosplatLayer implements CustomLayerInterface {
     gl.bindVertexArray(this.vao);
 
     const cornerBuffer = gl.createBuffer();
+    if (!cornerBuffer) throw new Error('Failed to create geosplat corner buffer.');
+    this.buffers.push(cornerBuffer);
     gl.bindBuffer(gl.ARRAY_BUFFER, cornerBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
     const cornerLocation = gl.getAttribLocation(this.program, 'a_corner');
@@ -185,6 +220,8 @@ export class GeosplatLayer implements CustomLayerInterface {
     gl.vertexAttribPointer(cornerLocation, 2, gl.FLOAT, false, 0, 0);
 
     const instanceBuffer = gl.createBuffer();
+    if (!instanceBuffer) throw new Error('Failed to create geosplat instance buffer.');
+    this.buffers.push(instanceBuffer);
     gl.bindBuffer(gl.ARRAY_BUFFER, instanceBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, this.instances, gl.STATIC_DRAW);
     const stride = this.floatsPerSplat * 4;
@@ -207,9 +244,11 @@ export class GeosplatLayer implements CustomLayerInterface {
     if (gl instanceof WebGL2RenderingContext) {
       if (this.program) gl.deleteProgram(this.program);
       if (this.vao) gl.deleteVertexArray(this.vao);
+      for (const buffer of this.buffers) gl.deleteBuffer(buffer);
     }
     this.program = null;
     this.vao = null;
+    this.buffers = [];
     this.map = null;
   }
 

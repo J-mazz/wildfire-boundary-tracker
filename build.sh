@@ -26,9 +26,6 @@ npx esbuild src/ts/main.ts "${esbuild_args[@]}"
 cp src/index.html dist/map.html
 cp -R public/. dist/
 cp public/fires.html dist/index.html
-rm -rf dist/data
-node tools/generate_headers.js public/data/catalog.config.json public/_headers.template dist/_headers
-rm -f dist/_headers.template
 
 echo "Build complete:"
 find dist -maxdepth 2 -type f -printf '  %p (%s bytes)\n' | sort

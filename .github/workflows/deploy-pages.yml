@@ -49,17 +49,8 @@ jobs:
       - name: Audit dependencies
         run: npm audit --audit-level=high
 
-      - name: Build WASM module
-        run: npm run build:wasm
-
-      - name: Build C++26 Worker engine
-        run: npm run build:worker-wasm
-
       - name: Run tests
         run: npm test
-
-      - name: Build production Pages bundle
-        run: npm run build:pages
 
       - name: Upload validated Pages bundle
         uses: actions/upload-artifact@v7

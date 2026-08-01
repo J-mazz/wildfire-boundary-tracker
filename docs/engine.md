@@ -28,16 +28,28 @@ operation so mutable linear memory never crosses requests.
   Edge-cached 10 minutes. Drives the landing page.
 
 - `GET /api/catalog?fire=irwin:<IrwinID>`
-  Synthesizes a snapshot catalog in the same contract as the static
-  `dist/data/catalog.json`, so the frontend cannot tell a live fire from a curated one.
-  Edge-cached 5 minutes per fire, matching its live polling interval.
+  Synthesizes the live snapshot catalog from NIFC and FIRMS. Edge-cached 5 minutes per
+  fire, matching its polling interval.
 
 - `GET /api/firms?fire=irwin:<id>&frame=<iso>&days=<n>`
-  Per-frame VIIRS GeoJSON with FRP, brightness, confidence, and day/night properties
-  (mirrors `tools/import_firms.py`). Returns 404 for empty frames. Edge-cached 30 minutes.
+  VIIRS GeoJSON for a validated frame persistence window with FRP, brightness,
+  confidence, and day/night properties. Returns 404 for empty frames.
+  Edge-cached 30 minutes.
 
-All Functions are strict TypeScript. Shared middleware is `functions/api/_engine.ts`;
-the compute module is `src/cpp/firms_engine.cpp` and builds to
+  The response is a **rolling window**, not a single pass: it carries the frame's own
+  detections plus every earlier detection within `PERSISTENCE_HOURS` (168h), each tagged
+  with its own `ageHours`. VIIRS only overflies a point a few times a day, so exact-frame
+  matching would leave most frames, including the live one the map opens on, empty. The
+  renderer fades each detection by its `ageHours` (see the age ramps in `MapController`).
+
+- `GET /api/perimeter?fire=irwin:<id>`
+  Current public, approved incident polygon from NIFC WFIGS. The live catalog advertises
+  it only on the newest snapshot because it is an operational perimeter, not historical
+  progression or model segmentation. Edge-cached 5 minutes.
+
+All Functions are strict TypeScript. `functions/api/_http.ts` owns timeouts, sanitized
+errors, structured logs, and deferred-operation reporting. Domain logic lives in
+`functions/api/_engine.ts`; the compute module is `src/cpp/firms_engine.cpp` and builds to
 `functions/wasm/firms_engine.wasm`.
 
 ## FIRMS quota protection
@@ -52,6 +64,7 @@ the compute module is `src/cpp/firms_engine.cpp` and builds to
   are skipped, and invalid legacy cache entries are evicted without sinking other lanes.
 - CSV is streamed into an 8 MiB WASM input buffer. Oversized responses fail explicitly.
 - The record arena holds 131,072 detections and the footprint has a 4 degree span cap.
+- Invalid Gregorian dates and out-of-range WGS84 coordinates are rejected in WASM.
 
 ## Credentials
 
