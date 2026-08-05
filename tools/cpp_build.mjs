@@ -79,11 +79,12 @@ function compilerIncludeDirectories() {
 
 function standardLibraryModule() {
   const executableDirectory = path.dirname(resolveExecutable(compiler));
+  const compilerDirectories = compilerIncludeDirectories();
   const candidates = [{
     source: process.env.CXX_STDLIB_MODULE_SOURCE,
     includeDirectory: process.env.CXX_STDLIB_MODULE_INCLUDE
   }];
-  for (const directory of compilerIncludeDirectories()) {
+  for (const directory of compilerDirectories) {
     candidates.push(
       { source: path.join(directory, 'bits/std.cc') },
       { source: path.join(directory, 'std.cppm') },
@@ -105,9 +106,26 @@ function standardLibraryModule() {
     return fs.existsSync(path.join(includeDirectory, 'std/algorithm.inc'));
   });
   if (selected) {
+    const moduleDirectory = selected.source.endsWith('std.cppm')
+      ? (selected.includeDirectory ?? path.dirname(selected.source))
+      : null;
+    const relativeHeaderDirectory = path.resolve(
+      path.dirname(selected.source),
+      '../../../include/c++/v1'
+    );
+    const headerDirectory = compilerDirectories.find((directory) => (
+      fs.existsSync(path.join(directory, '__config'))
+    )) ?? (
+      fs.existsSync(path.join(relativeHeaderDirectory, '__config'))
+        ? relativeHeaderDirectory
+        : null
+    );
+    const includeDirectories = [...new Set(
+      [moduleDirectory, headerDirectory].filter(Boolean)
+    )];
     return {
       source: selected.source,
-      includeFlags: selected.includeDirectory ? ['-I', selected.includeDirectory] : []
+      includeFlags: includeDirectories.flatMap((directory) => ['-I', directory])
     };
   }
   throw new Error(
