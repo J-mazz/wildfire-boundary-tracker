@@ -1,12 +1,6 @@
-module;
-
-#include <cstddef>
-#include <cstdint>
-#include <cstdlib>
-#include <span>
-
 module wildfire.geosplat.storage;
 
+import std;
 import wildfire.core;
 import wildfire.geosplat.format;
 import wildfire.memory;

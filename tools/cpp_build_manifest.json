@@ -2,35 +2,98 @@
   "schemaVersion": 1,
   "standard": "c++26",
   "modules": {
+    "std": {
+      "kind": "standard-library",
+      "imports": []
+    },
     "wildfire.core": {
       "interface": "src/cpp/modules/wildfire.core.cppm",
       "implementation": "src/cpp/modules/wildfire.core.cpp",
-      "imports": []
+      "imports": ["std"]
     },
     "wildfire.memory": {
       "interface": "src/cpp/modules/wildfire.memory.cppm",
       "implementation": "src/cpp/modules/wildfire.memory.cpp",
-      "imports": ["wildfire.core"]
+      "imports": ["std", "wildfire.core"]
+    },
+    "wildfire.firms.model": {
+      "interface": "src/cpp/modules/wildfire.firms.model.cppm",
+      "implementation": "src/cpp/modules/wildfire.firms.model.cpp",
+      "imports": ["std", "wildfire.memory"]
+    },
+    "wildfire.firms.numbers": {
+      "interface": "src/cpp/modules/wildfire.firms.numbers.cppm",
+      "implementation": "src/cpp/modules/wildfire.firms.numbers.cpp",
+      "imports": ["std", "wildfire.firms.model"]
+    },
+    "wildfire.firms.time": {
+      "interface": "src/cpp/modules/wildfire.firms.time.cppm",
+      "implementation": "src/cpp/modules/wildfire.firms.time.cpp",
+      "imports": ["std", "wildfire.firms.model", "wildfire.firms.numbers"]
+    },
+    "wildfire.firms.csv": {
+      "interface": "src/cpp/modules/wildfire.firms.csv.cppm",
+      "implementation": "src/cpp/modules/wildfire.firms.csv.cpp",
+      "imports": ["std", "wildfire.firms.model"]
+    },
+    "wildfire.firms.schema": {
+      "interface": "src/cpp/modules/wildfire.firms.schema.cppm",
+      "implementation": "src/cpp/modules/wildfire.firms.schema.cpp",
+      "imports": ["std", "wildfire.firms.model", "wildfire.firms.csv", "wildfire.firms.numbers"]
+    },
+    "wildfire.firms.ingest": {
+      "interface": "src/cpp/modules/wildfire.firms.ingest.cppm",
+      "implementation": "src/cpp/modules/wildfire.firms.ingest.cpp",
+      "imports": [
+        "std",
+        "wildfire.firms.model",
+        "wildfire.firms.csv",
+        "wildfire.firms.numbers",
+        "wildfire.firms.time",
+        "wildfire.firms.schema"
+      ]
+    },
+    "wildfire.firms.order": {
+      "interface": "src/cpp/modules/wildfire.firms.order.cppm",
+      "implementation": "src/cpp/modules/wildfire.firms.order.cpp",
+      "imports": ["std", "wildfire.firms.model"]
+    },
+    "wildfire.firms.footprint": {
+      "interface": "src/cpp/modules/wildfire.firms.footprint.cppm",
+      "implementation": "src/cpp/modules/wildfire.firms.footprint.cpp",
+      "imports": ["std", "wildfire.firms.model"]
+    },
+    "wildfire.firms.engine": {
+      "interface": "src/cpp/modules/wildfire.firms.engine.cppm",
+      "implementation": "src/cpp/modules/wildfire.firms.engine.cpp",
+      "imports": [
+        "std",
+        "wildfire.firms.model",
+        "wildfire.firms.ingest",
+        "wildfire.firms.order",
+        "wildfire.firms.footprint"
+      ]
     },
     "wildfire.geosplat.format": {
       "interface": "src/cpp/modules/wildfire.geosplat.format.cppm",
       "implementation": "src/cpp/modules/wildfire.geosplat.format.cpp",
-      "imports": ["wildfire.core"]
+      "imports": ["std", "wildfire.core"]
     },
     "wildfire.geosplat.decode": {
       "interface": "src/cpp/modules/wildfire.geosplat.decode.cppm",
       "implementation": "src/cpp/modules/wildfire.geosplat.decode.cpp",
-      "imports": ["wildfire.core", "wildfire.geosplat.format"]
+      "imports": ["std", "wildfire.core", "wildfire.geosplat.format"]
     },
     "wildfire.geosplat.storage": {
       "interface": "src/cpp/modules/wildfire.geosplat.storage.cppm",
       "implementation": "src/cpp/modules/wildfire.geosplat.storage.cpp",
-      "imports": ["wildfire.core", "wildfire.memory", "wildfire.geosplat.format"]
+      "imports": ["std", "wildfire.core", "wildfire.memory", "wildfire.geosplat.format"]
     },
     "wildfire.geosplat": {
       "interface": "src/cpp/geosplat.cppm",
       "implementation": "src/cpp/geosplat.cpp",
       "imports": [
+        "std",
         "wildfire.core",
         "wildfire.geosplat.format",
         "wildfire.geosplat.decode",
@@ -50,7 +113,7 @@
     },
     "host-firms-tests": {
       "toolchain": "host",
-      "modules": ["wildfire.core", "wildfire.memory"],
+      "modules": ["wildfire.firms.engine"],
       "sources": ["src/cpp/firms_engine.cpp", "tests/cpp/firms_engine_tests.cpp"],
       "includeDirectories": ["tests/cpp"],
       "compileFlags": ["-O2", "-Wall", "-Wextra", "-Wpedantic"],
@@ -68,11 +131,11 @@
     },
     "host-firms-benchmark": {
       "toolchain": "host",
-      "modules": ["wildfire.core", "wildfire.memory"],
+      "modules": ["wildfire.firms.engine"],
       "sources": ["src/cpp/firms_engine.cpp", "benchmarks/cpp/firms_benchmark.cpp"],
       "includeDirectories": [],
-      "compileFlags": ["-O3", "-DNDEBUG", "-DWILDFIRE_BENCHMARK_TELEMETRY", "-Wall", "-Wextra", "-Wpedantic"],
-      "linkFlags": [],
+      "compileFlags": ["-O3", "-flto", "-DNDEBUG", "-DWILDFIRE_BENCHMARK_TELEMETRY", "-Wall", "-Wextra", "-Wpedantic"],
+      "linkFlags": ["-fuse-ld=lld"],
       "output": "build/cpp/host-firms-benchmark/firms_benchmark"
     },
     "host-geosplat-benchmark": {
@@ -89,7 +152,7 @@
       "modules": ["wildfire.core", "wildfire.memory", "wildfire.geosplat"],
       "sources": ["src/cpp/main.cpp"],
       "includeDirectories": ["src/cpp"],
-      "compileFlags": ["-O3", "-DNDEBUG"],
+      "compileFlags": ["-O3", "-flto", "-DNDEBUG"],
       "linkFlags": [
         "-sALLOW_MEMORY_GROWTH=1",
         "-sINITIAL_MEMORY=33554432",
@@ -107,7 +170,7 @@
     },
     "worker-wasm": {
       "toolchain": "emscripten",
-      "modules": ["wildfire.core", "wildfire.memory"],
+      "modules": ["wildfire.memory", "wildfire.firms.engine"],
       "sources": ["src/cpp/firms_engine.cpp"],
       "includeDirectories": [],
       "compileFlags": ["-O3", "-DNDEBUG"],

@@ -1,10 +1,6 @@
-module;
-
-#include <cstddef>
-#include <cstdint>
-#include <span>
-
 export module wildfire.geosplat.format;
+
+import std;
 
 export namespace wildfire::geosplat::format {
 

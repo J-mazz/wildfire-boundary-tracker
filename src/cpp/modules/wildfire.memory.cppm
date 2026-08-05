@@ -1,12 +1,6 @@
-module;
-
-#include <cstddef>
-#include <cstdint>
-#include <memory_resource>
-#include <span>
-
 export module wildfire.memory;
 
+import std;
 import wildfire.core;
 
 export namespace wildfire::memory {
@@ -42,7 +36,7 @@ public:
 
     [[nodiscard]] void* allocate(
         std::size_t bytes,
-        std::size_t alignment = alignof(std::max_align_t)
+        std::size_t alignment = wildfire::core::default_new_alignment
     ) noexcept;
     void reset() noexcept;
 

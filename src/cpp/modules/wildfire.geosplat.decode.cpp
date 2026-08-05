@@ -1,13 +1,6 @@
-module;
-
-#include <bit>
-#include <cmath>
-#include <cstddef>
-#include <cstdint>
-#include <span>
-
 module wildfire.geosplat.decode;
 
+import std;
 import wildfire.core;
 import wildfire.geosplat.format;
 

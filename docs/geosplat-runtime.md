@@ -12,6 +12,9 @@ separating format validation, decode arithmetic, and ownership:
   byte limits, report allocation telemetry, and reset deterministically.
 - `wildfire.geosplat` is the compatibility facade used by host callers and `src/cpp/main.cpp`.
 
+Every interface and implementation is a C++26 named module unit with a direct `std` manifest
+dependency and `import std;`; none retains textual standard-library includes.
+
 The payload policy permits one live allocation up to 29,360,144 bytes. The decoded policy
 permits one live allocation up to 150,994,944 bytes. Those bounds derive from the
 4,194,304-splat cap; they are limits, not eagerly reserved static storage. A successful output

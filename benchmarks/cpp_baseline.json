@@ -33,7 +33,7 @@
     },
     {
       "benchmark": "geosplat_decode",
-      "throughput_items_per_second": 176218406.926,
+      "throughput_items_per_second": 193570205.973,
       "dynamic_allocation_count": 80,
       "allocation_high_water_bytes": 2818064,
       "payload_allocation_count": 40,
@@ -43,7 +43,7 @@
       "input_copy_bytes": 18350720,
       "decoded_copy_bytes": 0,
       "storage_limit_bytes": 180355088,
-      "binary_size_bytes": 45472,
+      "binary_size_bytes": 30160,
       "ratchets": {
         "throughput_items_per_second": {
           "direction": "higher",

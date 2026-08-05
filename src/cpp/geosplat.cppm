@@ -1,10 +1,6 @@
-module;
-
-#include <cstddef>
-#include <cstdint>
-
 export module wildfire.geosplat;
 
+import std;
 export namespace wildfire::geosplat {
 
 constexpr std::uint32_t kFloatsPerSplat = 9u;

@@ -1,11 +1,6 @@
-module;
-
-#include <cstddef>
-#include <cstdint>
-#include <span>
-
 export module wildfire.geosplat.storage;
 
+import std;
 import wildfire.memory;
 
 export namespace wildfire::geosplat::storage {

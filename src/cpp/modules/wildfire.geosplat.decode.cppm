@@ -1,10 +1,6 @@
-module;
-
-#include <cstddef>
-#include <span>
-
 export module wildfire.geosplat.decode;
 
+import std;
 import wildfire.geosplat.format;
 
 export namespace wildfire::geosplat::algorithm {

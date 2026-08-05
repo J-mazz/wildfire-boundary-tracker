@@ -19,6 +19,12 @@ precompiles `.pcm` BMIs, compiles interface and implementation objects with the 
 optimization flags, and links host, browser Wasm, Worker Wasm, and native ncnn targets.
 BMIs and objects stay under ignored `build/cpp/` directories.
 
+Every target compiles with Clang `-fmodules`. The graph builds the toolchain's standard
+library module first, and project module units use `import std;` instead of textual standard
+library includes. The driver locates libc++'s `std.cppm` or libstdc++'s `bits/std.cc`;
+set `CXX_STDLIB_MODULE_SOURCE` and, when its `std/*.inc` fragments live separately,
+`CXX_STDLIB_MODULE_INCLUDE` when using a nonstandard toolchain layout.
+
 The explicit Clang graph is intentional: Emscripten 6.0.3 support for CMake `CXX_MODULES`
 could not be proven across all four target shapes. The checked-in manifest avoids a second
 hand-maintained dependency order while keeping the npm commands stable.
@@ -35,6 +41,12 @@ The geosplat graph additionally separates `wildfire.geosplat.format`,
 `wildfire.geosplat.decode`, and `wildfire.geosplat.storage` behind the compatibility
 `wildfire.geosplat` facade. See [Geosplat browser runtime](geosplat-runtime.md) for ownership
 and linear-memory view guarantees.
+
+The FIRMS graph is rooted at `wildfire.firms.engine`. Focused named modules own its record
+model and arena-backed state, numeric parsing, Gregorian time parsing, CSV tokenization,
+column resolution, ingestion, ordering/deduplication, and footprint growth. The non-module
+`src/cpp/firms_engine.cpp` file owns only the stable C ABI and one bounded singleton adapter
+per Wasm instance. Geosplat and ncnn remain independent domain targets.
 
 ## WebAssembly
 
@@ -58,7 +70,8 @@ requests.
 ## Characterization and performance gates
 
 `npm run test:cpp` runs assert-based host tests for module helpers, allocator exhaustion and
-reset semantics, the FIRMS record ABI/parser boundary cases, and geosplat binary decoding.
+reset semantics, quoted/malformed CSV, Gregorian and numeric boundaries, FIRMS capacity and
+record ABI behavior, and geosplat binary decoding.
 The Node test entry point separately runs deployment/source, Worker Wasm ABI, and TypeScript
 behavior suites.
 
@@ -68,19 +81,20 @@ npm run benchmark:cpp
 
 The FIRMS parse/sort/dedupe and geosplat decode harnesses write
 `build/benchmarks/cpp-current.json`, including throughput, allocation or working-set
-high-water, copy volume, bounded storage limits, and executable-size metrics. FIRMS is
-static-storage-only, so
-its reserved and occupied storage are measured instead of claiming an unobservable heap
-allocation count. `benchmarks/cpp_baseline.json` owns the comparison
+high-water, copy volume, bounded storage limits, and executable-size metrics. FIRMS reserves
+one fixed adapter
+arena and obtains both its input and record regions through `wildfire.memory`; its reserved
+and occupied storage are measured instead of claiming an unobservable heap allocation count.
+`benchmarks/cpp_baseline.json` owns the comparison
 directions and tolerances. Update that baseline only after reviewing an intentional ratchet;
 the comparison tool has no performance limits compiled into its code. Throughput is reported
 with a wide warning ratchet because shared CI hardware is noisy; deterministic allocation,
 memory, complexity, and binary-size regressions fail the build.
 
-`npm run check:cpp-complexity` measures the new foundation, host harnesses, and
-characterized domain files with a limit of 10. The three pre-existing FIRMS parser
-exceptions are isolated in `benchmarks/cpp_complexity_baseline.json` and may not increase;
-domain decomposition is intentionally deferred beyond this foundation layer.
+`npm run check:cpp-complexity` measures the foundation, FIRMS modules, host harnesses, and
+characterized domain files with a limit of 10. FIRMS has no complexity exceptions;
+`benchmarks/cpp_complexity_baseline.json` remains the explicit ratchet for any characterized
+domain exception.
 
 ## ncnn and Vulkan
 
