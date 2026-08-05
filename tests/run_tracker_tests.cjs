@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+require('./run_ts_unit_tests.cjs');
 
 const root = path.resolve(__dirname, '..');
 const run = (command, args) => {
@@ -26,7 +27,9 @@ const landing = read('dist/index.html');
 const mapPage = read('dist/map.html');
 const bundle = read('dist/client.js');
 const mainSource = read('src/ts/main.ts');
+const appCoordinatorSource = read('src/ts/app/AppCoordinator.ts');
 const mapSource = read('src/ts/core/MapController.ts');
+const vectorLayerSource = read('src/ts/core/VectorLayerData.ts');
 const geosplatSource = read('src/ts/core/GeosplatLayer.ts');
 const catalogFunction = read('functions/api/catalog.ts');
 const catalogBuilder = read('functions/api/engine/catalog-builder.ts');
@@ -55,7 +58,7 @@ assert.ok(exists('functions/wasm/firms_engine.wasm'), 'Worker compute WASM missi
 
 assert.match(mainSource, /api\/catalog\?fire=/, 'frontend must use the live catalog endpoint');
 assert.doesNotMatch(mainSource, /data\/catalog\.json/, 'generic frontend must not fall back to a curated catalog');
-assert.match(mainSource, /setTerrainMetadataUrl/, 'terrain must be capability-gated by catalog metadata');
+assert.match(appCoordinatorSource, /setTerrainMetadataUrl/, 'terrain must be capability-gated by catalog metadata');
 assert.match(mapSource, /GeosplatLayer/, 'MapController lost DEM geosplat support');
 assert.match(geosplatSource, /metadataUrl/, 'geosplat metadata must be catalog-selectable');
 assert.match(bundle, /wildfire-geosplat/, 'geosplat renderer was not bundled');
@@ -253,6 +256,9 @@ assert.equal(
 assert.match(catalogBuilder, /frameCoverage\(/, 'live catalog must mark frames from the persistence window');
 assert.doesNotMatch(catalogBuilder, /framesWithData/, 'exact-frame-only matching must not return');
 assert.match(mapSource, /featureAge/, 'renderer must honour per-detection ages over per-layer ages');
+assert.match(catalogFunction, /frameCoverage\(/, 'live catalog must mark frames from the persistence window');
+assert.doesNotMatch(catalogFunction, /framesWithData/, 'exact-frame-only matching must not return');
+assert.match(vectorLayerSource, /featureAge/, 'renderer must honour per-detection ages over per-layer ages');
 
 assert.match(ncnnBuild, /-std=c\+\+26/, 'ncnn executor must compile as C++26');
 assert.match(ncnnSource, /use_vulkan_compute = true/, 'ncnn executor must require Vulkan compute');
