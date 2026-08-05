@@ -1,5 +1,4 @@
 #include <emscripten/emscripten.h>
-#include <cstdlib>
 #include <cstddef>
 
 import wildfire.geosplat;
@@ -8,12 +7,12 @@ extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
 void* ext_allocate_wasm_buffer(size_t size) {
-    return malloc(size);
+    return wildfire::geosplat::allocate_payload(size);
 }
 
 EMSCRIPTEN_KEEPALIVE
 void ext_free_wasm_buffer(void* ptr) {
-    free(ptr);
+    wildfire::geosplat::release_payload(ptr);
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -34,6 +33,16 @@ unsigned int geosplat_count() {
 EMSCRIPTEN_KEEPALIVE
 unsigned int geosplat_floats_per_splat() {
     return wildfire::geosplat::kFloatsPerSplat;
+}
+
+EMSCRIPTEN_KEEPALIVE
+unsigned int geosplat_generation() {
+    return wildfire::geosplat::generation();
+}
+
+EMSCRIPTEN_KEEPALIVE
+unsigned int geosplat_release_generation(unsigned int generation) {
+    return wildfire::geosplat::release_generation(generation);
 }
 
 EMSCRIPTEN_KEEPALIVE
