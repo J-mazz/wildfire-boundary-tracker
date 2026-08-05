@@ -22,7 +22,14 @@ export function createEngine(): FirmsExports {
   const exports = new WebAssembly.Instance(firmsEngineModule, {}).exports;
   if (!(exports.memory instanceof WebAssembly.Memory)
     || typeof exports.firms_input !== 'function'
-    || typeof exports.firms_finalize !== 'function') {
+    || typeof exports.firms_input_capacity !== 'function'
+    || typeof exports.firms_reset !== 'function'
+    || typeof exports.firms_ingest_csv !== 'function'
+    || typeof exports.firms_finalize !== 'function'
+    || typeof exports.firms_records !== 'function'
+    || typeof exports.firms_count !== 'function'
+    || typeof exports.firms_record_stride !== 'function'
+    || typeof exports.firms_bound !== 'function') {
     throw new Error('FIRMS WASM engine ABI mismatch.');
   }
   return exports as FirmsExports;
