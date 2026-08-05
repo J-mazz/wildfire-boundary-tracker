@@ -34,6 +34,7 @@ const workerEngineSources = [
   nifcClient,
   wasmAdapter
 ].join('\n');
+const catalogSources = [catalogFunction, workerEngineSources].join('\n');
 const incidentsFunction = read('functions/api/incidents.ts');
 const perimeterFunction = read('functions/api/perimeter.ts');
 const httpMiddleware = read('functions/api/_http.ts');
@@ -129,7 +130,7 @@ for (const endpoint of ['_engine', 'catalog', 'firms', 'incidents', 'perimeter']
 }
 
 assert.match(catalogBuilder, /frameCoverage\(/, 'live catalog must mark frames from the persistence window');
-assert.doesNotMatch(catalogFunction, /framesWithData/, 'exact-frame-only matching must not return');
+assert.doesNotMatch(catalogSources, /framesWithData/, 'exact-frame-only matching must not return');
 assert.match(vectorLayerSource, /featureAge/, 'renderer must honour per-detection ages over per-layer ages');
 assert.match(ncnnSource, /use_vulkan_compute = true/, 'ncnn executor must require Vulkan compute');
 assert.match(ncnnSource, /std::jthread/, 'ncnn executor must dispatch concurrent jobs');
