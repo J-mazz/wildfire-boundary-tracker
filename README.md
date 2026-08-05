@@ -17,7 +17,7 @@ setup is required.
 	This is an asynchronous publisher, never a request-time Python backend.
 - **Shared C++26 foundation**: `wildfire.core` provides checked bounded/endian helpers and
 	`wildfire.memory` provides bounded arenas, a slab pool, PMR integration, telemetry, and
-	target memory layouts. Existing domain engines are not migrated onto these allocators yet.
+	target memory layouts. The FIRMS engine uses an injected bounded arena with no heap fallback.
 
 Every rendered layer comes from real observations. Nothing is fabricated.
 
