@@ -27,6 +27,14 @@ Optional Sentinel, geosplat, and native ncnn/Vulkan products are external immuta
 assets. Publisher tools require explicit input and output paths. They never write browser
 configuration or modify the live NIFC/FIRMS catalog implicitly.
 
+The native publisher boundary uses checked little-endian tensor files. NCT1 stores the magic,
+width, height, channels, and element count before channel-major float32 values. NCO1 stores
+the magic, ncnn dimension count, width, height, depth, channels, and `ncnn::Mat::total()`
+before unpacked float32 storage. The NCO1 element count may include ncnn channel-stride
+padding; preserving it keeps the publisher binary-compatible with existing outputs. Outputs
+retain input order by filename (`INPUT.nct.nco`), and a batch returns exit code `6` if any
+input, inference, or output operation fails.
+
 Geosplat payloads use the little-endian `GSP1` layout documented in
 [`docs/geosplat-runtime.md`](geosplat-runtime.md). Browser decoding rejects non-exact payload
 lengths and grids above 4,194,304 splats.

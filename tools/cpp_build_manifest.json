@@ -105,6 +105,32 @@
         "wildfire.geosplat.decode",
         "wildfire.geosplat.storage"
       ]
+    },
+    "wildfire.tensor": {
+      "interface": "src/native/modules/wildfire.tensor.cppm",
+      "implementation": "src/native/modules/wildfire.tensor.cpp",
+      "imports": ["std", "wildfire.core"]
+    },
+    "wildfire.inference.options": {
+      "interface": "src/native/modules/wildfire.inference.options.cppm",
+      "implementation": "src/native/modules/wildfire.inference.options.cpp",
+      "imports": ["std"]
+    },
+    "wildfire.inference.scheduler": {
+      "interface": "src/native/modules/wildfire.inference.scheduler.cppm",
+      "implementation": "src/native/modules/wildfire.inference.scheduler.cpp",
+      "imports": ["std", "wildfire.core"]
+    },
+    "wildfire.inference.runtime": {
+      "interface": "src/native/modules/wildfire.inference.runtime.cppm",
+      "implementation": "src/native/modules/wildfire.inference.runtime.cpp",
+      "imports": [
+        "std",
+        "wildfire.memory",
+        "wildfire.tensor",
+        "wildfire.inference.options",
+        "wildfire.inference.scheduler"
+      ]
     }
   },
   "targets": {
@@ -144,6 +170,21 @@
       "linkFlags": [],
       "output": "build/cpp/host-geosplat-tests/geosplat_tests"
     },
+    "host-native-inference-tests": {
+      "toolchain": "host",
+      "modules": [
+        "wildfire.core",
+        "wildfire.memory",
+        "wildfire.tensor",
+        "wildfire.inference.options",
+        "wildfire.inference.scheduler"
+      ],
+      "sources": ["tests/cpp/native_inference_tests.cpp"],
+      "includeDirectories": [],
+      "compileFlags": ["-O2", "-Wall", "-Wextra", "-Wpedantic", "-pthread"],
+      "linkFlags": ["-pthread"],
+      "output": "build/cpp/host-native-inference-tests/native_inference_tests"
+    },
     "host-firms-benchmark": {
       "toolchain": "host",
       "modules": ["wildfire.firms.engine"],
@@ -170,6 +211,28 @@
       "compileFlags": ["-O3", "-DNDEBUG", "-DWILDFIRE_BENCHMARK_TELEMETRY", "-Wall", "-Wextra", "-Wpedantic"],
       "linkFlags": [],
       "output": "build/cpp/host-geosplat-benchmark/geosplat_benchmark"
+    },
+    "host-native-tensor-benchmark": {
+      "toolchain": "host",
+      "modules": ["wildfire.core", "wildfire.tensor"],
+      "sources": ["benchmarks/cpp/native_tensor_benchmark.cpp"],
+      "includeDirectories": [],
+      "compileFlags": ["-O3", "-DNDEBUG", "-Wall", "-Wextra", "-Wpedantic"],
+      "linkFlags": [],
+      "output": "build/cpp/host-native-tensor-benchmark/native_tensor_benchmark"
+    },
+    "host-native-scheduler-benchmark": {
+      "toolchain": "host",
+      "modules": [
+        "wildfire.core",
+        "wildfire.memory",
+        "wildfire.inference.scheduler"
+      ],
+      "sources": ["benchmarks/cpp/native_scheduler_benchmark.cpp"],
+      "includeDirectories": [],
+      "compileFlags": ["-O3", "-DNDEBUG", "-Wall", "-Wextra", "-Wpedantic", "-pthread"],
+      "linkFlags": ["-pthread"],
+      "output": "build/cpp/host-native-scheduler-benchmark/native_scheduler_benchmark"
     },
     "browser-wasm": {
       "toolchain": "emscripten",
@@ -211,7 +274,14 @@
     },
     "native-ncnn": {
       "toolchain": "host",
-      "modules": ["wildfire.core", "wildfire.memory"],
+      "modules": [
+        "wildfire.core",
+        "wildfire.memory",
+        "wildfire.tensor",
+        "wildfire.inference.options",
+        "wildfire.inference.scheduler",
+        "wildfire.inference.runtime"
+      ],
       "sources": ["src/native/ncnn_vulkan_batch.cpp"],
       "includeDirectories": [],
       "compileFlags": ["-O3", "-march=native", "-DNDEBUG", "-Wall", "-Wextra", "-Wpedantic", "-pthread"],

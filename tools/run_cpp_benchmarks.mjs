@@ -23,6 +23,16 @@ const benchmarks = [
     target: 'host-geosplat-benchmark',
     executable: 'build/cpp/host-geosplat-benchmark/geosplat_benchmark',
     arguments: []
+  },
+  {
+    target: 'host-native-tensor-benchmark',
+    executable: 'build/cpp/host-native-tensor-benchmark/native_tensor_benchmark',
+    arguments: []
+  },
+  {
+    target: 'host-native-scheduler-benchmark',
+    executable: 'build/cpp/host-native-scheduler-benchmark/native_scheduler_benchmark',
+    arguments: []
   }
 ];
 

@@ -26,6 +26,8 @@ set `CXX_STDLIB_MODULE_SOURCE` and, when its `std/*.inc` fragments live separate
 `CXX_STDLIB_MODULE_INCLUDE` when using a nonstandard toolchain layout. Set
 `CXX_HOST_STDLIB=libc++` or `libstdc++` to select a host library explicitly; CI installs
 libc++ 18 module sources/headers and compiles them with pinned Clang 21.
+The only textual includes in a project module unit are ncnn/Vulkan headers in the native
+runtime implementation's global module fragment; they are never exported through its BMI.
 
 The explicit Clang graph is intentional: Emscripten 6.0.3 support for CMake `CXX_MODULES`
 could not be proven across all four target shapes. The checked-in manifest avoids a second
@@ -48,8 +50,22 @@ The FIRMS graph is rooted at `wildfire.firms.engine`. Focused named modules own 
 model and arena-backed state, numeric parsing, Gregorian time parsing, CSV tokenization,
 column resolution, ingestion, ordering/deduplication, footprint growth, and timeline
 coverage/range queries. The non-module `src/cpp/firms_engine.cpp` file owns only the stable
-C ABI and one bounded singleton adapter per Wasm instance. Geosplat and ncnn remain
-independent domain targets.
+C ABI and one bounded singleton adapter per Wasm instance.
+
+The native executable adds four modules:
+
+- `wildfire.tensor`: checked NCT1/NCO1 layouts and little-endian file I/O without ncnn types.
+- `wildfire.inference.options`: declarative flags, typed validation, defaults, paths, and
+  stable CLI exit mapping.
+- `wildfire.inference.scheduler`: total CPU-budget partitioning, a PMR bounded FIFO, ordered
+  reports, and scheduler allocation sizing.
+- `wildfire.inference.runtime`: ncnn/Vulkan ownership, pool allocators, model loading, and
+  concurrent extraction. ncnn and Vulkan headers occur only in this implementation unit.
+
+The native scheduler injects a
+`wildfire.memory::ArenaResource` with no upstream fallback into its queue and report
+containers; allocation telemetry therefore covers those app structures. ncnn tensor storage
+uses explicit thread-safe `ncnn::PoolAllocator` instances for blob and workspace memory.
 
 ## WebAssembly
 
@@ -83,7 +99,8 @@ behavior suites.
 npm run benchmark:cpp
 ```
 
-The FIRMS parse/sort/dedupe, FIRMS timeline-query, and geosplat decode harnesses write
+The FIRMS parse/sort/dedupe, FIRMS timeline-query, geosplat decode, native tensor I/O, and
+native scheduler harnesses write
 `build/benchmarks/cpp-current.json`, including throughput, allocation or working-set
 high-water, copy volume, bounded storage limits, and executable-size metrics. FIRMS reserves
 one fixed adapter
@@ -96,8 +113,8 @@ the comparison tool has no performance limits compiled into its code. Throughput
 with a wide warning ratchet because shared CI hardware is noisy; deterministic allocation,
 memory, complexity, and binary-size regressions fail the build.
 
-`npm run check:cpp-complexity` measures the foundation, FIRMS modules, host harnesses, and
-characterized domain files with a limit of 10. FIRMS has no complexity exceptions;
+`npm run check:cpp-complexity` measures the foundation, FIRMS/geosplat/native modules, host
+harnesses, and characterized domain files with a limit of 10. FIRMS has no exceptions;
 `benchmarks/cpp_complexity_baseline.json` remains the explicit ratchet for any characterized
 domain exception.
 
@@ -112,7 +129,9 @@ npm run build:ncnn
 ```
 
 The executor accepts converted ncnn `.param` and `.bin` model shards plus one or more
-NCT1 float32 input tensors. It dispatches tensors through concurrent extractors:
+NCT1 float32 input tensors. All existing flags and defaults are retained: `--device` defaults
+to `0`, `--workers` defaults to `2` and accepts `1..32`, and `--list-devices` still requires
+Vulkan initialization. It dispatches tensors through concurrent extractors:
 
 ```bash
 bash tools/run_sam2_ncnn.sh \
@@ -124,15 +143,35 @@ bash tools/run_sam2_ncnn.sh \
   INPUT_1.nct INPUT_2.nct
 ```
 
-The current native CLI preserves its original behavior of assigning
-`hardware_concurrency()` threads to every extractor. With multiple `--workers`, that can
-oversubscribe the CPU by `workers * hardware_concurrency`. The later native modularization
-phase must add an explicit total/per-extractor thread budget (coordinated with target memory
-layout configuration) rather than changing this foundation PR's CLI behavior.
+`hardware_concurrency()` is one total CPU budget, not a per-extractor setting. Active
+extractors are capped by requested workers, pending inputs, and that total. The scheduler
+divides the budget as evenly as possible, gives every extractor at least one thread, and
+assigns any remainder to lower worker indexes. For example, three workers on eight logical
+CPUs receive `3,3,2`, never `8,8,8`. Work completion may be concurrent, but failures and the
+final report are emitted in original input order.
 
-NCT1 is five little-endian `uint32` values (`magic`, width, height, channels, elements)
-followed by channel-major float32 data. Outputs use the NCO1 header documented by
-`src/native/ncnn_vulkan_batch.cpp`.
+NCT1 is five little-endian `uint32` values (`"NCT1"`, width, height, channels, elements)
+followed by channel-major little-endian float32 data. NCO1 is seven little-endian `uint32`
+values (`"NCO1"`, dimensions, width, height, depth, channels, elements) followed by the
+unpacked little-endian float32 storage returned by ncnn. Its element count remains
+`ncnn::Mat::total()` for binary compatibility and may include ncnn channel-stride padding.
+Checked products reject zero, inconsistent, overflowing, or truncated inputs before ncnn
+receives them. Packed NCT1 channels are read directly into each ncnn `cstep`, so aligned
+pool storage does not shift later channels. Outputs whose storage is smaller than their
+logical dimensions are rejected.
+
+Host coverage does not require ncnn or Vulkan:
+
+```bash
+npm run test:cpp
+npm run benchmark:cpp
+```
+
+On a provisioned publisher, `npm run test:ncnn-integration` builds the native target, checks
+CLI exit behavior, enumerates Vulkan devices, and optionally runs one real model/input smoke
+inference when all `WILDFIRE_NCNN_*` paths and tensor names are set. This repository does not
+bundle those model assets. A machine without the project-local ncnn install, its pkg-config
+metadata, and a Vulkan device cannot compile or run that integration hook.
 
 Model conversion is an explicit preparation step and converted weights are not committed.
 The tracker does not include a Python inference backend or silently fall back from Vulkan.

@@ -39,6 +39,7 @@ const incidentsFunction = read('functions/api/incidents.ts');
 const perimeterFunction = read('functions/api/perimeter.ts');
 const httpMiddleware = read('functions/api/_http.ts');
 const ncnnSource = read('src/native/ncnn_vulkan_batch.cpp');
+const ncnnRuntimeSource = read('src/native/modules/wildfire.inference.runtime.cpp');
 const cppBuildDriver = read('tools/cpp_build.mjs');
 const cppManifest = JSON.parse(read('tools/cpp_build_manifest.json'));
 const ciWorkflow = read('.github/workflows/deploy-pages.yml');
@@ -75,7 +76,20 @@ for (const [moduleName, definition] of Object.entries(cppManifest.modules)) {
   for (const sourcePath of [definition.interface, definition.implementation].filter(Boolean)) {
     const source = read(sourcePath);
     assert.match(source, /import std;/, `${sourcePath} must consume the standard library module`);
-    assert.doesNotMatch(source, /#include\s*</, `${sourcePath} retained textual standard library includes`);
+    const includes = [...source.matchAll(/#include\s*<([^>]+)>/g)];
+    for (const include of includes) {
+      assert.equal(
+        moduleName,
+        'wildfire.inference.runtime',
+        `${sourcePath} retained textual standard library includes`
+      );
+      assert.match(include[1], /^ncnn\/(?:gpu|net)\.h$/, `${sourcePath} includes an unexpected header`);
+      const moduleDeclaration = source.indexOf(`module ${moduleName};`);
+      assert.ok(
+        source.indexOf(include[0]) < moduleDeclaration,
+        `${sourcePath} third-party header escaped the global module fragment`
+      );
+    }
   }
 }
 const browserTarget = cppManifest.targets['browser-wasm'];
@@ -137,8 +151,9 @@ assert.match(catalogBuilder, /result\.timeline\?\.coverage\(/, 'live catalog mus
 assert.doesNotMatch(calculations, /frameCoverage|toFrameFeatures|while \(head|while \(tail/, 'timeline scans must not return to TypeScript');
 assert.doesNotMatch(catalogSources, /framesWithData/, 'exact-frame-only matching must not return');
 assert.match(vectorLayerSource, /featureAge/, 'renderer must honour per-detection ages over per-layer ages');
-assert.match(ncnnSource, /use_vulkan_compute = true/, 'ncnn executor must require Vulkan compute');
-assert.match(ncnnSource, /std::jthread/, 'ncnn executor must dispatch concurrent jobs');
+assert.match(ncnnRuntimeSource, /use_vulkan_compute = true/, 'ncnn executor must require Vulkan compute');
+assert.match(ncnnRuntimeSource, /std::jthread/, 'ncnn executor must dispatch concurrent jobs');
+assert.match(ncnnSource, /run_native/, 'ncnn entrypoint must delegate to the native runtime module');
 assert.ok(!exists('tools/process_hotspot_sam2.py'), 'sequential Python SAM-2 implementation remains');
 
 console.log('Deployment, build graph, and source contracts passed.');
