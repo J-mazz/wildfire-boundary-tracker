@@ -55,6 +55,7 @@ export class VectorLayerData {
 
   load(layer: SnapshotLayer): Promise<FeatureCollection> {
     if (!layer.url) return Promise.resolve(EMPTY_COLLECTION);
+    if (layer.contextType === 'incident-perimeter') return this.fetchCollection(layer);
     const cached = this.cache.get(layer.url);
     if (cached) return cached;
     const pending = this.fetchCollection(layer).catch((error: unknown) => {

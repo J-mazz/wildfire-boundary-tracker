@@ -2,7 +2,6 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-require('./run_ts_unit_tests.cjs');
 
 const root = path.resolve(__dirname, '..');
 const run = (command, args) => {
@@ -255,9 +254,6 @@ assert.equal(
 );
 assert.match(catalogBuilder, /frameCoverage\(/, 'live catalog must mark frames from the persistence window');
 assert.doesNotMatch(catalogBuilder, /framesWithData/, 'exact-frame-only matching must not return');
-assert.match(mapSource, /featureAge/, 'renderer must honour per-detection ages over per-layer ages');
-assert.match(catalogFunction, /frameCoverage\(/, 'live catalog must mark frames from the persistence window');
-assert.doesNotMatch(catalogFunction, /framesWithData/, 'exact-frame-only matching must not return');
 assert.match(vectorLayerSource, /featureAge/, 'renderer must honour per-detection ages over per-layer ages');
 
 assert.match(ncnnBuild, /-std=c\+\+26/, 'ncnn executor must compile as C++26');

@@ -28,6 +28,11 @@ const { CatalogSelectionState } = bundle(
   'catalog-selection-state.cjs'
 );
 const { PlaybackState } = bundle('src/ts/app/PlaybackState.ts', 'playback-state.cjs');
+const { CatalogClient, catalogCacheKey } = bundle(
+  'src/ts/network/CatalogClient.ts',
+  'catalog-client.cjs'
+);
+const { fetchWithTimeout } = bundle('src/ts/network/fetch.ts', 'browser-fetch.cjs');
 
 const layer = (overrides = {}) => ({
   id: 'firms-1',
@@ -114,10 +119,20 @@ assert.throws(
 );
 const sparseCenter = [];
 sparseCenter.length = 2;
-assert.strictEqual(
-  validateCatalog({ ...validCatalog, event: { ...validCatalog.event, center: sparseCenter } }).event.center,
-  sparseCenter,
-  'validation must retain the existing sparse coordinate tuple contract'
+assert.throws(
+  () => validateCatalog({ ...validCatalog, event: { ...validCatalog.event, center: sparseCenter } }),
+  /event\.center: Catalog event center or bounds are invalid/,
+  'sparse coordinate tuples must be rejected'
+);
+const sparseTiles = [];
+sparseTiles.length = 1;
+assert.throws(
+  () => validateCatalog({
+    ...validCatalog,
+    app: { ...validCatalog.app, baseImagery: { ...validCatalog.app.baseImagery, tiles: sparseTiles } }
+  }),
+  /at app: Catalog app configuration is invalid/,
+  'sparse URL arrays must be rejected'
 );
 
 const selection = new CatalogSelectionState();
@@ -145,4 +160,61 @@ assert.equal(playback.isLive, true);
 playback.selectHistorical();
 assert.equal(playback.isLive, false);
 
-console.log('Catalog validators and frontend state transitions passed.');
+assert.notEqual(
+  catalogCacheKey('./api/catalog?fire=irwin:one'),
+  catalogCacheKey('./api/catalog?fire=irwin:two'),
+  'cached catalogs must be isolated by request URL'
+);
+
+void (async () => {
+  const timers = new Map();
+  let nextTimer = 1;
+  global.window = {
+    setTimeout(callback) {
+      const id = nextTimer++;
+      timers.set(id, callback);
+      return id;
+    },
+    clearTimeout(id) {
+      timers.delete(id);
+    }
+  };
+  const storage = new Map();
+  global.localStorage = {
+    getItem: (key) => storage.get(key) ?? null,
+    setItem: (key, value) => storage.set(key, value)
+  };
+  let resolveFetch;
+  global.fetch = () => new Promise((resolve) => {
+    resolveFetch = resolve;
+  });
+  let delivered = false;
+  const client = new CatalogClient('./api/catalog?fire=irwin:one');
+  client.start(() => {
+    delivered = true;
+  }, () => {
+    delivered = true;
+  });
+  client.stop();
+  resolveFetch(new Response(JSON.stringify(validCatalog), {
+    headers: { 'Content-Type': 'application/json' }
+  }));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(delivered, false, 'stopped clients must ignore in-flight refresh completion');
+  assert.equal(timers.size, 0, 'stopped clients must not schedule another poll');
+
+  global.fetch = (_input, init) => Promise.resolve(new Response(new ReadableStream({
+    start(stream) {
+      init.signal.addEventListener('abort', () => stream.error(new Error('aborted')));
+    }
+  })));
+  const stalled = await fetchWithTimeout('/stalled-body', {}, 15);
+  const stalledRead = stalled.text();
+  for (const callback of [...timers.values()]) callback();
+  await assert.rejects(stalledRead, /Request timed out after 15ms/);
+  assert.equal(timers.size, 0, 'body completion or timeout must clear the request deadline');
+  console.log('Catalog validators and frontend state transitions passed.');
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

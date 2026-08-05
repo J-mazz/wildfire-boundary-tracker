@@ -8,6 +8,7 @@ buildSync({
   entryPoints: {
     calculations: path.join(root, 'functions/api/engine/calculations.ts'),
     catalog: path.join(root, 'functions/api/engine/catalog-builder.ts'),
+    http: path.join(root, 'functions/api/_http.ts'),
     validation: path.join(root, 'functions/api/engine/validation.ts')
   },
   bundle: true,
@@ -18,6 +19,7 @@ buildSync({
 
 const calculations = require(path.join(outdir, 'calculations.js'));
 const { buildCatalog, createCatalogPlan } = require(path.join(outdir, 'catalog.js'));
+const { fetchUpstream } = require(path.join(outdir, 'http.js'));
 const validation = require(path.join(outdir, 'validation.js'));
 
 assert.equal(validation.finiteNumber(12.5), 12.5);
@@ -115,4 +117,37 @@ assert.equal(absent.catalog.snapshots[0].layers[0].status, 'unavailable');
 assert.equal(absent.catalog.snapshots[0].layers[0].statusReason, 'FIRMS_MAP_KEY is not configured');
 assert.deepEqual(absent.cacheableFrames, []);
 
-console.log('Worker validation, timeline, and catalog builder contracts passed.');
+void (async () => {
+  const originalSetTimeout = global.setTimeout;
+  const originalClearTimeout = global.clearTimeout;
+  const timers = new Map();
+  let nextTimer = 1;
+  global.setTimeout = (callback) => {
+    const id = nextTimer++;
+    timers.set(id, callback);
+    return id;
+  };
+  global.clearTimeout = (id) => {
+    timers.delete(id);
+  };
+  global.fetch = (_input, init) => Promise.resolve(new Response(new ReadableStream({
+    start(stream) {
+      init.signal.addEventListener('abort', () => stream.error(new Error('aborted')));
+    }
+  })));
+  try {
+    const stalled = await fetchUpstream('stalled service', 'https://example.test/stalled');
+    const stalledRead = stalled.text();
+    for (const callback of [...timers.values()]) callback();
+    await assert.rejects(stalledRead, /stalled service: timed out after 15000ms/);
+    assert.equal(timers.size, 0, 'Worker body timeout must clear its deadline');
+  } finally {
+    global.setTimeout = originalSetTimeout;
+    global.clearTimeout = originalClearTimeout;
+    delete global.fetch;
+  }
+  console.log('Worker validation, timeline, and catalog builder contracts passed.');
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

@@ -12,10 +12,10 @@
     "dev": "npm run build:pages && wrangler pages dev dist --env-file .env.local",
     "types": "wrangler types --env-file .dev.vars.example",
     "typecheck": "wrangler types --env-file .dev.vars.example --check && tsc --noEmit && tsc -p tsconfig.functions.json",
+    "test:map-controller": "node tests/map_controller_collaborators.cjs",
+    "test:ts": "node tests/run_ts_unit_tests.cjs",
     "test:worker": "node tests/worker_engine_modules_test.cjs",
-    "test": "npm run build:pages && npm run typecheck && npm run test:worker && node tests/run_tracker_tests.cjs"
-    "test": "npm run build:pages && npm run typecheck && node tests/run_tracker_tests.cjs && node tests/map_controller_collaborators.cjs",
-    "test:map-controller": "node tests/map_controller_collaborators.cjs"
+    "test": "npm run build:pages && npm run typecheck && npm run test:ts && npm run test:map-controller && npm run test:worker && node tests/run_tracker_tests.cjs"
   },
   "dependencies": {
     "@tmcw/togeojson": "^7.1.2",
@@ -24,6 +24,9 @@
   "devDependencies": {
     "esbuild": "^0.28.1",
     "typescript": "^7.0.2",
-    "wrangler": "^4.114.0"
+    "wrangler": "^4.118.0"
+  },
+  "overrides": {
+    "undici": "7.29.0"
   }
 }
