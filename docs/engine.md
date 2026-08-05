@@ -48,9 +48,12 @@ operation so mutable linear memory never crosses requests.
   progression or model segmentation. Edge-cached 5 minutes.
 
 All Functions are strict TypeScript. `functions/api/_http.ts` owns timeouts, sanitized
-errors, structured logs, and deferred-operation reporting. Domain logic lives in
-`functions/api/_engine.ts`; the compute module is `src/cpp/firms_engine.cpp` and builds to
-`functions/wasm/firms_engine.wasm`.
+errors, structured logs, and deferred-operation reporting. Focused modules under
+`functions/api/engine/` own domain types, NIFC validation and clients, FIRMS batching,
+the request-local WASM adapter, pure frame calculations, cache keys, response
+serialization, and catalog construction. `functions/api/_engine.ts` remains a
+compatibility re-export facade. The compute module is `src/cpp/firms_engine.cpp` and
+builds to `functions/wasm/firms_engine.wasm`.
 
 ## FIRMS quota protection
 
