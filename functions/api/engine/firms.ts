@@ -1,13 +1,12 @@
 import { fetchUpstream, logDegraded } from '../_http';
 import { firmsBatchCacheRequest } from './cache';
 import { quantizeBounds } from './calculations';
-import type { Bounds, Defer, DetectionResult } from './domain';
+import { MAX_HISTORY_DAYS, type Bounds, type Defer, type DetectionResult } from './domain';
 import { createEngine, finalizeEngine, ingestResponse, type FirmsExports } from './wasm';
 
 const FIRMS_AREA = 'https://firms.modaps.eosdis.nasa.gov/api/area/csv';
 const FIRMS_SOURCES = ['VIIRS_SNPP_NRT', 'VIIRS_NOAA20_NRT', 'VIIRS_NOAA21_NRT'] as const;
 const BATCH_DAYS = 4;
-const MAX_HISTORY_DAYS = 10;
 
 interface Batch {
   start: string;
