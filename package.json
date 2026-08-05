@@ -15,7 +15,10 @@
     "typecheck": "wrangler types --env-file .dev.vars.example --check && tsc --noEmit && tsc -p tsconfig.functions.json",
     "benchmark:cpp": "node tools/run_cpp_benchmarks.mjs && node tools/compare_cpp_benchmarks.mjs benchmarks/cpp_baseline.json build/benchmarks/cpp-current.json --enforce",
     "check:cpp-complexity": "node tools/check_cpp_complexity.mjs",
-    "test": "npm run build:pages && npm run typecheck && npm run test:cpp && node tests/run_tracker_tests.cjs",
+    "test:map-controller": "node tests/map_controller_collaborators.cjs",
+    "test:ts": "node tests/run_ts_unit_tests.cjs",
+    "test:worker": "node tests/worker_engine_modules_test.cjs",
+    "test": "npm run build:pages && npm run typecheck && npm run test:cpp && npm run test:ts && npm run test:map-controller && npm run test:worker && node tests/run_tracker_tests.cjs",
     "test:cpp": "npm run check:cpp-complexity && node tools/run_cpp_tests.mjs"
   },
   "dependencies": {
@@ -25,6 +28,9 @@
   "devDependencies": {
     "esbuild": "^0.28.1",
     "typescript": "^7.0.2",
-    "wrangler": "^4.114.0"
+    "wrangler": "^4.118.0"
+  },
+  "overrides": {
+    "undici": "7.29.0"
   }
 }

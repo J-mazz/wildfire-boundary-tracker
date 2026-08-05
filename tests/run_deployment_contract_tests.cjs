@@ -17,10 +17,23 @@ const landing = read('dist/index.html');
 const mapPage = read('dist/map.html');
 const bundle = read('dist/client.js');
 const mainSource = read('src/ts/main.ts');
+const appCoordinatorSource = read('src/ts/app/AppCoordinator.ts');
 const mapSource = read('src/ts/core/MapController.ts');
+const vectorLayerSource = read('src/ts/core/VectorLayerData.ts');
 const geosplatSource = read('src/ts/core/GeosplatLayer.ts');
 const catalogFunction = read('functions/api/catalog.ts');
-const workerMiddleware = read('functions/api/_engine.ts');
+const catalogBuilder = read('functions/api/engine/catalog-builder.ts');
+const calculations = read('functions/api/engine/calculations.ts');
+const firmsOrchestration = read('functions/api/engine/firms.ts');
+const nifcClient = read('functions/api/engine/nifc.ts');
+const wasmAdapter = read('functions/api/engine/wasm.ts');
+const workerEngineSources = [
+  catalogBuilder,
+  calculations,
+  firmsOrchestration,
+  nifcClient,
+  wasmAdapter
+].join('\n');
 const incidentsFunction = read('functions/api/incidents.ts');
 const perimeterFunction = read('functions/api/perimeter.ts');
 const httpMiddleware = read('functions/api/_http.ts');
@@ -42,7 +55,7 @@ assert.ok(exists('functions/wasm/firms_engine.wasm'), 'Worker compute WASM missi
 
 assert.match(mainSource, /api\/catalog\?fire=/, 'frontend must use the live catalog endpoint');
 assert.doesNotMatch(mainSource, /data\/catalog\.json/, 'generic frontend must not fall back to a curated catalog');
-assert.match(mainSource, /setTerrainMetadataUrl/, 'terrain must be capability-gated by catalog metadata');
+assert.match(appCoordinatorSource, /setTerrainMetadataUrl/, 'terrain must be capability-gated by catalog metadata');
 assert.match(mapSource, /GeosplatLayer/, 'MapController lost DEM geosplat support');
 assert.match(geosplatSource, /metadataUrl/, 'geosplat metadata must be catalog-selectable');
 assert.match(bundle, /wildfire-geosplat/, 'geosplat renderer was not bundled');
@@ -81,21 +94,21 @@ for (const removed of [
   'src/native/osm_context_to_kml.cpp'
 ]) assert.ok(!containsFiles(removed), `dead browser pipeline remains: ${removed}`);
 
-assert.match(catalogFunction, /startedAt:/, 'live catalog event metadata is incomplete');
-assert.match(catalogFunction, /status: hasData \|\| hasCurrentPerimeter \? 'ready' : 'awaiting-data'/, 'snapshot readiness must include every visible live overlay');
-assert.match(catalogFunction, /status: hasData \? 'ready' : 'unavailable'/, 'layer status contract drifted');
-assert.match(workerMiddleware, /firmsEngineModule/, 'TypeScript middleware must invoke C++ WASM');
-assert.doesNotMatch(workerMiddleware, /split\('\n'\)|parseCsv/, 'FIRMS CSV parsing leaked back into TypeScript');
-assert.match(workerMiddleware, /await Promise\.all\(FIRMS_SOURCES\.flatMap/, 'FIRMS fetch lanes must run concurrently');
+assert.match(catalogBuilder, /startedAt:/, 'live catalog event metadata is incomplete');
+assert.match(catalogBuilder, /status: hasData \|\| hasCurrentPerimeter \? 'ready' : 'awaiting-data'/, 'snapshot readiness must include every visible live overlay');
+assert.match(catalogBuilder, /if \(!hasData\)[\s\S]*status: 'unavailable'/, 'layer status contract drifted');
+assert.match(wasmAdapter, /firmsEngineModule/, 'TypeScript middleware must invoke C++ WASM');
+assert.doesNotMatch(workerEngineSources, /split\('\n'\)|parseCsv/, 'FIRMS CSV parsing leaked back into TypeScript');
+assert.match(firmsOrchestration, /await Promise\.all\(FIRMS_SOURCES\.flatMap/, 'FIRMS fetch lanes must run concurrently');
 assert.match(httpMiddleware, /withApiErrors/, 'Pages Functions must share a sanitized error boundary');
 assert.match(httpMiddleware, /UPSTREAM_TIMEOUT_MS/, 'upstream requests must have a bounded lifetime');
-assert.ok(workerMiddleware.indexOf('await ingestResponse') < workerMiddleware.indexOf('defer(cache.put'), 'FIRMS payload must parse before entering cache');
-assert.match(workerMiddleware, /defer\(cache\.delete\(item\.cacheKey\), 'firms_batch_cache_delete'\)/, 'invalid cached FIRMS payloads must be evicted');
-assert.match(workerMiddleware, /Math\.sqrt\(sizeAcres \* 4046\.86 \/ Math\.PI\)/, 'incident acreage must grow the FIRMS query footprint');
-assert.match(workerMiddleware, /WFIGS_Interagency_Perimeters_Current/, 'live engine must query the official current perimeter service');
-assert.match(workerMiddleware, /poly_IRWINID = '\{\$\{normalizedId\}\}'/, 'perimeter lookup must use the indexed braced IRWIN ID');
-assert.match(catalogFunction, /Current WFIGS incident perimeter/, 'live catalog must expose an operational perimeter when available');
-assert.match(catalogFunction, /index === frameTimes\.length - 1/, 'a current perimeter must not masquerade as historical progression');
+assert.ok(firmsOrchestration.indexOf('await ingestResponse') < firmsOrchestration.indexOf('defer(cache.put'), 'FIRMS payload must parse before entering cache');
+assert.match(firmsOrchestration, /defer\(cache\.delete\(item\.cacheKey\), 'firms_batch_cache_delete'\)/, 'invalid cached FIRMS payloads must be evicted');
+assert.match(calculations, /Math\.sqrt\(sizeAcres \* 4046\.86 \/ Math\.PI\)/, 'incident acreage must grow the FIRMS query footprint');
+assert.match(nifcClient, /WFIGS_Interagency_Perimeters_Current/, 'live engine must query the official current perimeter service');
+assert.match(nifcClient, /poly_IRWINID = '\{\$\{normalizedId\}\}'/, 'perimeter lookup must use the indexed braced IRWIN ID');
+assert.match(catalogBuilder, /Current WFIGS incident perimeter/, 'live catalog must expose an operational perimeter when available');
+assert.match(catalogBuilder, /index === input\.plan\.frameTimes\.length - 1/, 'a current perimeter must not masquerade as historical progression');
 assert.match(perimeterFunction, /fetchCurrentPerimeter/, 'perimeter endpoint must use the validated engine helper');
 assert.doesNotMatch(incidentsFunction, /IncidentSize > 0/, 'new zero-size incidents must remain discoverable');
 for (const endpoint of ['_engine', 'catalog', 'firms', 'incidents', 'perimeter']) {
@@ -103,9 +116,9 @@ for (const endpoint of ['_engine', 'catalog', 'firms', 'incidents', 'perimeter']
   assert.ok(!exists(`functions/api/${endpoint}.js`), `${endpoint} legacy JavaScript Function remains`);
 }
 
-assert.match(catalogFunction, /frameCoverage\(/, 'live catalog must mark frames from the persistence window');
+assert.match(catalogBuilder, /frameCoverage\(/, 'live catalog must mark frames from the persistence window');
 assert.doesNotMatch(catalogFunction, /framesWithData/, 'exact-frame-only matching must not return');
-assert.match(mapSource, /featureAge/, 'renderer must honour per-detection ages over per-layer ages');
+assert.match(vectorLayerSource, /featureAge/, 'renderer must honour per-detection ages over per-layer ages');
 assert.match(ncnnSource, /use_vulkan_compute = true/, 'ncnn executor must require Vulkan compute');
 assert.match(ncnnSource, /std::jthread/, 'ncnn executor must dispatch concurrent jobs');
 assert.ok(!exists('tools/process_hotspot_sam2.py'), 'sequential Python SAM-2 implementation remains');

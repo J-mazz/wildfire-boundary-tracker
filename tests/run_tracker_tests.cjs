@@ -14,5 +14,3 @@ for (const suite of suites) {
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
-
-console.log('Tracker deployment, Wasm ABI, and TypeScript suites passed.');
