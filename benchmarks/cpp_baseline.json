@@ -36,7 +36,7 @@
       "throughput_frames_per_second": 2184778.502,
       "scratch_high_water_bytes": 3072,
       "bounded_allocation_count": 2,
-      "binary_size_bytes": 20680,
+      "binary_size_bytes": 28592,
       "ratchets": {
         "throughput_frames_per_second": {
           "direction": "higher",
