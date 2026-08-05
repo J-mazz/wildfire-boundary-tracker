@@ -10,15 +10,89 @@ interface GeosplatMeta {
   url: string;
 }
 
-interface WildfireWasm {
+export interface WildfireWasm {
   _ext_allocate_wasm_buffer(size: number): number;
   _ext_free_wasm_buffer(ptr: number): void;
   _geosplat_decode(ptr: number, length: number): number;
   _geosplat_data(): number;
   _geosplat_count(): number;
   _geosplat_floats_per_splat(): number;
+  _geosplat_generation(): number;
+  _geosplat_release_generation(generation: number): number;
   _geosplat_release(): void;
   HEAPU8: Uint8Array;
+}
+
+interface DecodedInstances {
+  readonly count: number;
+  upload(gl: WebGL2RenderingContext): void;
+  dispose(): void;
+}
+
+class ArrayDecodedInstances implements DecodedInstances {
+  readonly count: number;
+
+  constructor(
+    private readonly instances: Float32Array,
+    floatsPerSplat: number
+  ) {
+    this.count = instances.length / floatsPerSplat;
+  }
+
+  upload(gl: WebGL2RenderingContext): void {
+    gl.bufferData(gl.ARRAY_BUFFER, this.instances, gl.STATIC_DRAW);
+  }
+
+  dispose(): void {}
+}
+
+export class WasmDecodedInstances implements DecodedInstances {
+  readonly count: number;
+  private released = false;
+  private readonly generation: number;
+
+  constructor(
+    private readonly wasm: WildfireWasm,
+    private readonly dataPtr: number,
+    count: number,
+    private readonly floatsPerSplat: number
+  ) {
+    if (!Number.isSafeInteger(count) || count <= 0
+      || !Number.isSafeInteger(floatsPerSplat) || floatsPerSplat <= 0
+      || !Number.isSafeInteger(dataPtr) || dataPtr <= 0 || dataPtr % 4 !== 0) {
+      throw new Error('WASM geosplat output descriptor is invalid.');
+    }
+    this.count = count;
+    this.generation = wasm._geosplat_generation();
+    if (!Number.isSafeInteger(this.generation) || this.generation <= 0) {
+      throw new Error('WASM geosplat ownership generation is invalid.');
+    }
+  }
+
+  upload(gl: WebGL2RenderingContext): void {
+    if (this.released) throw new Error('WASM geosplat output was already released.');
+    if (this.wasm._geosplat_generation() !== this.generation) {
+      throw new Error('WASM geosplat output ownership is stale.');
+    }
+    const floatCount = this.count * this.floatsPerSplat;
+    if (!Number.isSafeInteger(floatCount) || floatCount <= 0) {
+      throw new Error('WASM geosplat output length overflows safe integer range.');
+    }
+    const byteLength = floatCount * Float32Array.BYTES_PER_ELEMENT;
+    const heap = this.wasm.HEAPU8;
+    const end = this.dataPtr + byteLength;
+    if (!Number.isSafeInteger(byteLength) || !Number.isSafeInteger(end) || end > heap.byteLength) {
+      throw new Error('WASM geosplat output exceeds linear memory.');
+    }
+    const view = new Float32Array(heap.buffer, this.dataPtr, floatCount);
+    gl.bufferData(gl.ARRAY_BUFFER, view, gl.STATIC_DRAW);
+  }
+
+  dispose(): void {
+    if (this.released) return;
+    this.released = true;
+    this.wasm._geosplat_release_generation(this.generation);
+  }
 }
 
 const VERTEX_SHADER = `#version 300 es
@@ -134,11 +208,16 @@ export class GeosplatLayer implements CustomLayerInterface {
 
   constructor(
     private readonly meta: GeosplatMeta,
-    private readonly instances: Float32Array,
+    instances: Float32Array | WasmDecodedInstances,
     private readonly floatsPerSplat: number
   ) {
-    this.instanceCount = instances.length / floatsPerSplat;
+    this.decoded = instances instanceof WasmDecodedInstances
+      ? instances
+      : new ArrayDecodedInstances(instances, floatsPerSplat);
+    this.instanceCount = this.decoded.count;
   }
+
+  private readonly decoded: DecodedInstances;
 
   static async load(metadataUrl: string, onError: (message: string) => void): Promise<GeosplatLayer | null> {
     try {
@@ -173,15 +252,16 @@ export class GeosplatLayer implements CustomLayerInterface {
 
       const floatsPerSplat = wasm._geosplat_floats_per_splat();
       const dataPtr = wasm._geosplat_data();
-      let instances: Float32Array;
       try {
-        const view = new Float32Array(wasm.HEAPU8.buffer, dataPtr, count * floatsPerSplat);
-        instances = view.slice();
-      } finally {
+        return new GeosplatLayer(
+          meta,
+          new WasmDecodedInstances(wasm, dataPtr, count, floatsPerSplat),
+          floatsPerSplat
+        );
+      } catch (error) {
         wasm._geosplat_release();
+        throw error;
       }
-
-      return new GeosplatLayer(meta, instances, floatsPerSplat);
     } catch (error) {
       onError(`Terrain view unavailable: ${error instanceof Error ? error.message : String(error)}`);
       return null;
@@ -192,64 +272,33 @@ export class GeosplatLayer implements CustomLayerInterface {
     if (!(gl instanceof WebGL2RenderingContext)) {
       throw new Error('Geosplat terrain requires a WebGL2 context.');
     }
+    if (this.program || this.vao || this.buffers.length > 0) this.deleteGlResources(gl);
     this.map = map;
-    const [west, south, east, north] = this.meta.bounds;
-    const northWest = maplibregl.MercatorCoordinate.fromLngLat({ lng: west, lat: north });
-    const southEast = maplibregl.MercatorCoordinate.fromLngLat({ lng: east, lat: south });
-    this.mercOrigin = [northWest.x, northWest.y];
-    this.mercSpan = [southEast.x - northWest.x, southEast.y - northWest.y];
-    this.metersToMerc = northWest.meterInMercatorCoordinateUnits();
-    const widthMeters = (east - west) * 111_320 * Math.cos(((south + north) / 2) * (Math.PI / 180));
-    this.radiusMeters = (widthMeters / this.meta.grid[0]) * 1.2;
-
-    this.program = compileProgram(gl);
-    for (const name of ['u_matrix', 'u_mercOrigin', 'u_mercSpan', 'u_metersToMerc', 'u_radiusMeters']) {
-      this.uniforms[name] = gl.getUniformLocation(this.program, name);
+    try {
+      const [west, south, east, north] = this.meta.bounds;
+      const northWest = maplibregl.MercatorCoordinate.fromLngLat({ lng: west, lat: north });
+      const southEast = maplibregl.MercatorCoordinate.fromLngLat({ lng: east, lat: south });
+      this.mercOrigin = [northWest.x, northWest.y];
+      this.mercSpan = [southEast.x - northWest.x, southEast.y - northWest.y];
+      this.metersToMerc = northWest.meterInMercatorCoordinateUnits();
+      const widthMeters = (east - west) * 111_320 * Math.cos(((south + north) / 2) * (Math.PI / 180));
+      this.radiusMeters = (widthMeters / this.meta.grid[0]) * 1.2;
+      this.createGlResources(gl);
+    } catch (error) {
+      this.deleteGlResources(gl);
+      this.map = null;
+      throw error;
     }
-
-    this.vao = gl.createVertexArray();
-    gl.bindVertexArray(this.vao);
-
-    const cornerBuffer = gl.createBuffer();
-    if (!cornerBuffer) throw new Error('Failed to create geosplat corner buffer.');
-    this.buffers.push(cornerBuffer);
-    gl.bindBuffer(gl.ARRAY_BUFFER, cornerBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-    const cornerLocation = gl.getAttribLocation(this.program, 'a_corner');
-    gl.enableVertexAttribArray(cornerLocation);
-    gl.vertexAttribPointer(cornerLocation, 2, gl.FLOAT, false, 0, 0);
-
-    const instanceBuffer = gl.createBuffer();
-    if (!instanceBuffer) throw new Error('Failed to create geosplat instance buffer.');
-    this.buffers.push(instanceBuffer);
-    gl.bindBuffer(gl.ARRAY_BUFFER, instanceBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, this.instances, gl.STATIC_DRAW);
-    const stride = this.floatsPerSplat * 4;
-    const attributes: Array<[string, number, number]> = [
-      ['a_gridPos', 3, 0],
-      ['a_color', 3, 12],
-      ['a_normal', 3, 24]
-    ];
-    for (const [name, size, offset] of attributes) {
-      const location = gl.getAttribLocation(this.program, name);
-      gl.enableVertexAttribArray(location);
-      gl.vertexAttribPointer(location, size, gl.FLOAT, false, stride, offset);
-      gl.vertexAttribDivisor(location, 1);
-    }
-
-    gl.bindVertexArray(null);
   }
 
   onRemove(_map: maplibregl.Map, gl: WebGLRenderingContext | WebGL2RenderingContext): void {
-    if (gl instanceof WebGL2RenderingContext) {
-      if (this.program) gl.deleteProgram(this.program);
-      if (this.vao) gl.deleteVertexArray(this.vao);
-      for (const buffer of this.buffers) gl.deleteBuffer(buffer);
-    }
-    this.program = null;
-    this.vao = null;
-    this.buffers = [];
+    if (gl instanceof WebGL2RenderingContext) this.deleteGlResources(gl);
+    this.dispose();
     this.map = null;
+  }
+
+  dispose(): void {
+    this.decoded.dispose();
   }
 
   render(gl: WebGLRenderingContext | WebGL2RenderingContext, options: CustomRenderMethodInput): void {
@@ -276,5 +325,52 @@ export class GeosplatLayer implements CustomLayerInterface {
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
     this.map?.triggerRepaint();
+  }
+
+  private createGlResources(gl: WebGL2RenderingContext): void {
+    this.program = compileProgram(gl);
+    for (const name of ['u_matrix', 'u_mercOrigin', 'u_mercSpan', 'u_metersToMerc', 'u_radiusMeters']) {
+      this.uniforms[name] = gl.getUniformLocation(this.program, name);
+    }
+    this.vao = gl.createVertexArray();
+    if (!this.vao) throw new Error('Failed to create geosplat vertex array.');
+    gl.bindVertexArray(this.vao);
+
+    const cornerBuffer = gl.createBuffer();
+    if (!cornerBuffer) throw new Error('Failed to create geosplat corner buffer.');
+    this.buffers.push(cornerBuffer);
+    gl.bindBuffer(gl.ARRAY_BUFFER, cornerBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const cornerLocation = gl.getAttribLocation(this.program, 'a_corner');
+    gl.enableVertexAttribArray(cornerLocation);
+    gl.vertexAttribPointer(cornerLocation, 2, gl.FLOAT, false, 0, 0);
+
+    const instanceBuffer = gl.createBuffer();
+    if (!instanceBuffer) throw new Error('Failed to create geosplat instance buffer.');
+    this.buffers.push(instanceBuffer);
+    gl.bindBuffer(gl.ARRAY_BUFFER, instanceBuffer);
+    this.decoded.upload(gl);
+    const stride = this.floatsPerSplat * 4;
+    for (const [name, size, offset] of [
+      ['a_gridPos', 3, 0],
+      ['a_color', 3, 12],
+      ['a_normal', 3, 24]
+    ] as Array<[string, number, number]>) {
+      const location = gl.getAttribLocation(this.program, name);
+      gl.enableVertexAttribArray(location);
+      gl.vertexAttribPointer(location, size, gl.FLOAT, false, stride, offset);
+      gl.vertexAttribDivisor(location, 1);
+    }
+    gl.bindVertexArray(null);
+  }
+
+  private deleteGlResources(gl: WebGL2RenderingContext): void {
+    if (this.program) gl.deleteProgram(this.program);
+    if (this.vao) gl.deleteVertexArray(this.vao);
+    for (const buffer of this.buffers) gl.deleteBuffer(buffer);
+    this.program = null;
+    this.vao = null;
+    this.buffers = [];
+    this.uniforms = {};
   }
 }

@@ -27,6 +27,10 @@ Optional Sentinel, geosplat, and native ncnn/Vulkan products are external immuta
 assets. Publisher tools require explicit input and output paths. They never write browser
 configuration or modify the live NIFC/FIRMS catalog implicitly.
 
+Geosplat payloads use the little-endian `GSP1` layout documented in
+[`docs/geosplat-runtime.md`](geosplat-runtime.md). Browser decoding rejects non-exact payload
+lengths and grids above 4,194,304 splats.
+
 ## Production notes
 
 - **Base imagery** is selected by the live catalog. The CSP currently allows the default

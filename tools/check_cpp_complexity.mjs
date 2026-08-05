@@ -8,7 +8,11 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const maximumComplexity = 10;
 const roots = ['src/cpp/modules', 'tests/cpp', 'benchmarks/cpp'];
-const characterizedDomainFiles = ['src/cpp/firms_engine.cpp', 'src/cpp/geosplat.cppm'];
+const characterizedDomainFiles = [
+  'src/cpp/firms_engine.cpp',
+  'src/cpp/geosplat.cppm',
+  'src/cpp/geosplat.cpp'
+];
 const baseline = JSON.parse(fs.readFileSync(
   path.join(root, 'benchmarks/cpp_complexity_baseline.json'),
   'utf8'

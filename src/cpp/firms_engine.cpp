@@ -14,14 +14,17 @@ struct FirmsAdapter {
     wildfire::firms::EngineState engine{arena};
 };
 
-FirmsAdapter g_adapter;
+FirmsAdapter& adapter() {
+    static FirmsAdapter instance;
+    return instance;
+}
 
 } // namespace
 
 extern "C" {
 
 std::uint8_t* firms_input() {
-    return g_adapter.engine.input();
+    return adapter().engine.input();
 }
 
 std::uint32_t firms_input_capacity() {
@@ -29,11 +32,11 @@ std::uint32_t firms_input_capacity() {
 }
 
 void firms_reset() {
-    g_adapter.engine.reset();
+    adapter().engine.reset();
 }
 
 int firms_ingest_csv(const std::uint32_t byte_length) {
-    return wildfire::firms::ingest_csv(g_adapter.engine, byte_length);
+    return wildfire::firms::ingest_csv(adapter().engine, byte_length);
 }
 
 std::uint32_t firms_finalize(
@@ -45,7 +48,7 @@ std::uint32_t firms_finalize(
     const double max_span_degrees
 ) {
     return wildfire::firms::finalize(
-        g_adapter.engine,
+        adapter().engine,
         west,
         south,
         east,
@@ -56,11 +59,11 @@ std::uint32_t firms_finalize(
 }
 
 const wildfire::firms::DetectionRecord* firms_records() {
-    return g_adapter.engine.records();
+    return adapter().engine.records();
 }
 
 std::uint32_t firms_count() {
-    return g_adapter.engine.count();
+    return adapter().engine.count();
 }
 
 std::uint32_t firms_record_stride() {
@@ -69,18 +72,18 @@ std::uint32_t firms_record_stride() {
 
 double firms_bound(const std::uint32_t index) {
     return index < 4u
-        ? g_adapter.engine.bounds()[index]
+        ? adapter().engine.bounds()[index]
         : std::numeric_limits<double>::quiet_NaN();
 }
 
 #if defined(WILDFIRE_BENCHMARK_TELEMETRY)
 
 void firms_benchmark_reset_telemetry() {
-    g_adapter.engine.reset_working_set_telemetry();
+    adapter().engine.reset_working_set_telemetry();
 }
 
 std::size_t firms_benchmark_working_set_high_water() {
-    return g_adapter.engine.working_set_high_water();
+    return adapter().engine.working_set_high_water();
 }
 
 std::size_t firms_benchmark_reserved_storage_bytes() {
