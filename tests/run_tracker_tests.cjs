@@ -29,7 +29,12 @@ const mainSource = read('src/ts/main.ts');
 const mapSource = read('src/ts/core/MapController.ts');
 const geosplatSource = read('src/ts/core/GeosplatLayer.ts');
 const catalogFunction = read('functions/api/catalog.ts');
-const workerMiddleware = read('functions/api/_engine.ts');
+const catalogBuilder = read('functions/api/engine/catalog-builder.ts');
+const calculations = read('functions/api/engine/calculations.ts');
+const firmsOrchestration = read('functions/api/engine/firms.ts');
+const nifcClient = read('functions/api/engine/nifc.ts');
+const wasmAdapter = read('functions/api/engine/wasm.ts');
+const workerEngineSources = [catalogBuilder, calculations, firmsOrchestration, nifcClient, wasmAdapter].join('\n');
 const workerBuild = read('tools/build_worker_wasm.sh');
 const browserBuild = read('tools/build_wasm.sh');
 const incidentsFunction = read('functions/api/incidents.ts');
@@ -73,21 +78,23 @@ for (const removed of [
   'src/native/osm_context_to_kml.cpp'
 ]) assert.ok(!containsFiles(removed), `dead browser pipeline remains: ${removed}`);
 
-assert.match(catalogFunction, /startedAt:/, 'live catalog event metadata is incomplete');
-assert.match(catalogFunction, /status: hasData \|\| hasCurrentPerimeter \? 'ready' : 'awaiting-data'/, 'snapshot readiness must include every visible live overlay');
-assert.match(catalogFunction, /status: hasData \? 'ready' : 'unavailable'/, 'layer status contract drifted');
-assert.match(workerMiddleware, /firmsEngineModule/, 'TypeScript middleware must invoke C++ WASM');
-assert.doesNotMatch(workerMiddleware, /split\('\n'\)|parseCsv/, 'FIRMS CSV parsing leaked back into TypeScript');
-assert.match(workerMiddleware, /await Promise\.all\(FIRMS_SOURCES\.flatMap/, 'FIRMS fetch lanes must run concurrently');
+assert.match(catalogBuilder, /startedAt:/, 'live catalog event metadata is incomplete');
+assert.match(catalogBuilder, /status: hasData \|\| hasCurrentPerimeter \? 'ready' : 'awaiting-data'/, 'snapshot readiness must include every visible live overlay');
+assert.match(catalogBuilder, /if \(!hasData\)[\s\S]*status: 'unavailable'/, 'empty FIRMS layers must remain unavailable');
+assert.match(catalogBuilder, /status: 'ready',[\s\S]*url: `\.\/api\/firms/, 'populated FIRMS layers must remain ready');
+assert.match(catalogFunction, /buildCatalog\(/, 'catalog handler must delegate pure snapshot construction');
+assert.match(wasmAdapter, /firmsEngineModule/, 'TypeScript middleware must invoke C++ WASM');
+assert.doesNotMatch(workerEngineSources, /split\('\n'\)|parseCsv/, 'FIRMS CSV parsing leaked back into TypeScript');
+assert.match(firmsOrchestration, /await Promise\.all\(FIRMS_SOURCES\.flatMap/, 'FIRMS fetch lanes must run concurrently');
 assert.match(httpMiddleware, /withApiErrors/, 'Pages Functions must share a sanitized error boundary');
 assert.match(httpMiddleware, /UPSTREAM_TIMEOUT_MS/, 'upstream requests must have a bounded lifetime');
-assert.ok(workerMiddleware.indexOf('await ingestResponse') < workerMiddleware.indexOf('defer(cache.put'), 'FIRMS payload must parse before entering cache');
-assert.match(workerMiddleware, /defer\(cache\.delete\(item\.cacheKey\), 'firms_batch_cache_delete'\)/, 'invalid cached FIRMS payloads must be evicted');
-assert.match(workerMiddleware, /Math\.sqrt\(sizeAcres \* 4046\.86 \/ Math\.PI\)/, 'incident acreage must grow the FIRMS query footprint');
-assert.match(workerMiddleware, /WFIGS_Interagency_Perimeters_Current/, 'live engine must query the official current perimeter service');
-assert.match(workerMiddleware, /poly_IRWINID = '\{\$\{normalizedId\}\}'/, 'perimeter lookup must use the indexed braced IRWIN ID');
-assert.match(catalogFunction, /Current WFIGS incident perimeter/, 'live catalog must expose an operational perimeter when available');
-assert.match(catalogFunction, /index === frameTimes\.length - 1/, 'a current perimeter must not masquerade as historical progression');
+assert.ok(firmsOrchestration.indexOf('await ingestResponse') < firmsOrchestration.indexOf('defer(cache.put'), 'FIRMS payload must parse before entering cache');
+assert.match(firmsOrchestration, /defer\(cache\.delete\(item\.cacheKey\), 'firms_batch_cache_delete'\)/, 'invalid cached FIRMS payloads must be evicted');
+assert.match(calculations, /Math\.sqrt\(sizeAcres \* 4046\.86 \/ Math\.PI\)/, 'incident acreage must grow the FIRMS query footprint');
+assert.match(nifcClient, /WFIGS_Interagency_Perimeters_Current/, 'live engine must query the official current perimeter service');
+assert.match(nifcClient, /poly_IRWINID = '\{\$\{normalizedId\}\}'/, 'perimeter lookup must use the indexed braced IRWIN ID');
+assert.match(catalogBuilder, /Current WFIGS incident perimeter/, 'live catalog must expose an operational perimeter when available');
+assert.match(catalogBuilder, /index === input\.plan\.frameTimes\.length - 1/, 'a current perimeter must not masquerade as historical progression');
 assert.match(perimeterFunction, /fetchCurrentPerimeter/, 'perimeter endpoint must use the validated engine helper');
 assert.doesNotMatch(incidentsFunction, /IncidentSize > 0/, 'new zero-size incidents must remain discoverable');
 for (const endpoint of ['_engine', 'catalog', 'firms', 'incidents', 'perimeter']) {
@@ -243,8 +250,8 @@ assert.equal(
   '2026-07-25T12:30:00Z',
   'a frame must report its newest contributing pass'
 );
-assert.match(catalogFunction, /frameCoverage\(/, 'live catalog must mark frames from the persistence window');
-assert.doesNotMatch(catalogFunction, /framesWithData/, 'exact-frame-only matching must not return');
+assert.match(catalogBuilder, /frameCoverage\(/, 'live catalog must mark frames from the persistence window');
+assert.doesNotMatch(catalogBuilder, /framesWithData/, 'exact-frame-only matching must not return');
 assert.match(mapSource, /featureAge/, 'renderer must honour per-detection ages over per-layer ages');
 
 assert.match(ncnnBuild, /-std=c\+\+26/, 'ncnn executor must compile as C++26');
