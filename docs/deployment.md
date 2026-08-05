@@ -7,7 +7,8 @@ npm run deploy:pages
 
 The production build strips source maps, bundles the WASM artifacts, validates Pages file
 limits, scans output for local secret values, and publishes the security policy from
-`public/_headers`.
+`public/_headers`. It independently bundles `src/ts/landing/main.ts` to `dist/fires.js` and
+the MapLibre application to `dist/client.js`; `public/` contains static assets only.
 
 `.github/workflows/deploy-pages.yml` validates pull requests and deploys pushes to `main`.
 Required GitHub configuration:

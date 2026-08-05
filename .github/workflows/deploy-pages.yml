@@ -39,6 +39,18 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.11.27'
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
       - name: Set up Emscripten
         uses: emscripten-core/setup-emsdk@v16
         with:

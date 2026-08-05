@@ -7,9 +7,19 @@ Clang binary for local host builds.
 ```bash
 npm install
 uv sync
+npm run check:source-complexity
+npm run test:python
 npm run test:cpp
 npm test
 ```
+
+## Browser ownership
+
+`src/ts/landing/` owns the root incident picker. `incidents.ts` is the typed HTTP boundary,
+`render.ts` owns filtering and DOM construction, and `controller.ts` owns loading, search
+events, and visible failure mapping. `build.sh` bundles it to `dist/fires.js`; the source is
+not kept under `public/`. The independent map client remains rooted at `src/ts/main.ts` and
+bundles to `dist/client.js`.
 
 ## C++26 module graph
 
@@ -26,6 +36,9 @@ set `CXX_STDLIB_MODULE_SOURCE` and, when its `std/*.inc` fragments live separate
 `CXX_STDLIB_MODULE_INCLUDE` when using a nonstandard toolchain layout. Set
 `CXX_HOST_STDLIB=libc++` or `libstdc++` to select a host library explicitly; CI installs
 libc++ 18 module sources/headers and compiles them with pinned Clang 21.
+`tools/load_emsdk.sh` is the shared environment boundary used by both browser and Worker Wasm
+wrappers; target definitions and dependency order remain exclusively in the JSON manifest and
+JavaScript driver.
 The only textual includes in a project module unit are ncnn/Vulkan headers in the native
 runtime implementation's global module fragment; they are never exported through its BMI.
 
@@ -118,6 +131,13 @@ harnesses, and characterized domain files with a limit of 10. FIRMS has no excep
 `benchmarks/cpp_complexity_baseline.json` remains the explicit ratchet for any characterized
 domain exception.
 
+`npm run check:source-complexity` measures every landing-client function and every Python
+function under `tools/`, including the publisher and the checker itself. It has a hard
+cyclomatic-complexity limit of 10 with no exceptions or baseline overrides. The command emits
+the measured function count and maximum observed CCN as JSON. The final modularization
+validation measured 64 source functions with maximum CCN 6; the existing C++ ratchet measured
+378 functions with maximum CCN 10.
+
 ## ncnn and Vulkan
 
 Install and build the native inference executor locally:
@@ -178,8 +198,14 @@ The tracker does not include a Python inference backend or silently fall back fr
 
 ## Offline geospatial tools
 
-Python remains only for deterministic geospatial preparation. Geosplat generation
-requires explicit bounds, source imagery, output directory, and public payload URL:
+Python remains only for deterministic geospatial preparation. `tools/build_geosplat.py` is a
+stable thin CLI entrypoint. Focused modules under `tools/geosplat_publisher/` own options and
+validation, remote DEM/local image I/O, pure terrain transformation, artifact serialization,
+and orchestration. Binary planes are written through contiguous buffer views rather than
+materializing additional `bytes` copies.
+
+Geosplat generation requires explicit bounds, source imagery, output directory, and public
+payload URL:
 
 ```bash
 uv run python tools/build_geosplat.py \
@@ -188,3 +214,7 @@ uv run python tools/build_geosplat.py \
   --output OUTPUT_DIRECTORY \
   --public-url terrain.splat
 ```
+
+The flags, defaults, traceback/exit behavior, `GSP1` layout, metadata keys, and deterministic
+tile traversal are characterized by `npm run test:python`. No Python service or inference
+fallback exists.
