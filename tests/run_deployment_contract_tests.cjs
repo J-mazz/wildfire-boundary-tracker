@@ -14,6 +14,7 @@ const containsFiles = (relative) => {
 };
 
 const landing = read('dist/index.html');
+const landingBundle = read('dist/fires.js');
 const mapPage = read('dist/map.html');
 const bundle = read('dist/client.js');
 const mainSource = read('src/ts/main.ts');
@@ -47,6 +48,8 @@ const ciWorkflow = read('.github/workflows/deploy-pages.yml');
 assert.match(landing, /Current wildfires/, 'root must be the NIFC incident picker');
 assert.match(landing, /fires\.js/, 'landing page script missing');
 assert.doesNotMatch(landing, /client\.js|id="map"/, 'landing page must not boot the map renderer');
+assert.ok(!exists('public/fires.js'), 'untyped landing compatibility script remains');
+assert.match(landingBundle, /Incident response is invalid/, 'typed landing validation was not bundled');
 assert.match(mapPage, /id="map"/, 'map entrypoint missing');
 assert.match(mapPage, /id="terrain-button"/, '3D terrain capability must remain available');
 assert.match(mapPage, /client\.js/, 'map entrypoint must load the TypeScript frontend bundle');
@@ -70,6 +73,9 @@ assert.match(cppBuildDriver, /'-fmodules'/, 'C++ targets must enable Clang modul
 assert.match(cppBuildDriver, /CXX_HOST_STDLIB/, 'host standard library selection missing');
 assert.match(ciWorkflow, /CXX_HOST_STDLIB: libc\+\+/, 'CI must select the installed libc++ module');
 assert.match(ciWorkflow, /libc\+\+-18-dev libc\+\+abi-18-dev/, 'CI libc++ module packages missing');
+assert.match(ciWorkflow, /actions\/setup-python@v6/, 'CI Python 3.13 setup missing');
+assert.match(ciWorkflow, /astral-sh\/setup-uv@v7/, 'CI uv setup missing');
+assert.match(ciWorkflow, /version: '0\.11\.27'/, 'CI uv version must remain pinned');
 for (const [moduleName, definition] of Object.entries(cppManifest.modules)) {
   if (definition.kind === 'standard-library') continue;
   assert.ok(definition.imports.includes('std'), `${moduleName} must import std`);

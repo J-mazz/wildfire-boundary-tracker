@@ -26,7 +26,8 @@ operation so mutable linear memory never crosses requests.
 - `GET /api/incidents`
   Current wildfire incidents from the NIFC WFIGS FeatureServer (public, no key).
   Trimmed to name, IrwinID, discovery date, size, containment, state, and location.
-  Edge-cached 10 minutes. Drives the landing page.
+  Edge-cached 10 minutes. `src/ts/landing/incidents.ts` validates this untrusted JSON before
+  `render.ts` creates any links or visible metadata.
 
 - `GET /api/catalog?fire=irwin:<IrwinID>`
   Synthesizes the live snapshot catalog from NIFC and FIRMS. Edge-cached 5 minutes per

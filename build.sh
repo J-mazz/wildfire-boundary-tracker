@@ -23,6 +23,20 @@ if [[ "${SOURCE_MAPS:-1}" == "1" ]]; then
 fi
 npx esbuild src/ts/main.ts "${esbuild_args[@]}"
 
+echo "Bundling incident landing page..."
+landing_args=(
+  --bundle \
+  --format=esm \
+  --platform=browser \
+  --target=es2022 \
+  --minify \
+  --outfile=dist/fires.js
+)
+if [[ "${SOURCE_MAPS:-1}" == "1" ]]; then
+  landing_args+=(--sourcemap)
+fi
+npx esbuild src/ts/landing/main.ts "${landing_args[@]}"
+
 cp src/index.html dist/map.html
 cp -R public/. dist/
 cp public/fires.html dist/index.html

@@ -15,11 +15,13 @@
     "typecheck": "wrangler types --env-file .dev.vars.example --check && tsc --noEmit && tsc -p tsconfig.functions.json",
     "benchmark:cpp": "node tools/run_cpp_benchmarks.mjs && node tools/compare_cpp_benchmarks.mjs benchmarks/cpp_baseline.json build/benchmarks/cpp-current.json --enforce",
     "check:cpp-complexity": "node tools/check_cpp_complexity.mjs",
+    "check:source-complexity": "node tools/check_source_complexity.mjs",
+    "test:python": "PYTHONPATH=tools uv run python -m unittest discover -s tests/python -p 'test_*.py'",
     "test:map-controller": "node tests/map_controller_collaborators.cjs",
-    "test:ts": "node tests/run_ts_unit_tests.cjs && node tests/geosplat_layer_test.cjs",
+    "test:ts": "node tests/run_ts_unit_tests.cjs && node tests/geosplat_layer_test.cjs && node tests/landing_client_test.cjs",
     "test:worker": "node tests/worker_engine_modules_test.cjs",
     "test:ncnn-integration": "bash tools/test_ncnn_vulkan.sh",
-    "test": "npm run build:pages && npm run typecheck && npm run test:cpp && npm run test:ts && npm run test:map-controller && npm run test:worker && node tests/run_tracker_tests.cjs",
+    "test": "npm run build:pages && npm run typecheck && npm run check:source-complexity && npm run test:python && npm run test:cpp && npm run test:ts && npm run test:map-controller && npm run test:worker && node tests/run_tracker_tests.cjs",
     "test:cpp": "npm run check:cpp-complexity && node tools/run_cpp_tests.mjs"
   },
   "dependencies": {
@@ -27,6 +29,7 @@
     "maplibre-gl": "^5.24.0"
   },
   "devDependencies": {
+    "acorn": "^8.18.0",
     "esbuild": "^0.28.1",
     "typescript": "^7.0.2",
     "wrangler": "^4.118.0"

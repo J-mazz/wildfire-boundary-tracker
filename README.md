@@ -6,7 +6,9 @@ setup is required.
 
 ## Runtime
 
-- **TypeScript frontend**: MapLibre map, timeline, UI, and catalog client.
+- **TypeScript browser clients**: a small validated NIFC incident picker plus the MapLibre
+  map, timeline, UI, and catalog client. Both are bundled from `src/ts/`; no handwritten
+  browser JavaScript is deployed.
 - **TypeScript middleware**: Cloudflare Pages Functions handle upstream fetches, cache
 	control, validation, and catalog/GeoJSON serialization.
 - **C++26 WebAssembly**: the edge engine streams FIRMS CSV bytes into fixed linear
@@ -35,6 +37,7 @@ Every rendered layer comes from real observations. Nothing is fabricated.
 - [Development](docs/development.md): builds, local tools, ncnn/Vulkan, and geosplat
 - [Data contract](docs/data-contract.md): catalog and optional layer capabilities
 - [Deployment](docs/deployment.md): Cloudflare Pages, Functions, and secrets
+- [Geosplat runtime](docs/geosplat-runtime.md): browser decoder and offline publisher
 
 The curated East Evans Creek visualization remains in
 [fire-progression-NRTDV](https://github.com/J-mazz/fire-progression-NRTDV).

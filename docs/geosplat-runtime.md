@@ -59,3 +59,19 @@ All scalar fields are little-endian:
 
 The payload length must equal `16 + 7 * count`. Zero-sized grids, truncated or extended
 payloads, arithmetic overflow, and grids above the splat cap return zero without decoding.
+
+## Offline publisher ownership
+
+`tools/build_geosplat.py` preserves the publishing CLI while delegating to
+`tools/geosplat_publisher/`:
+
+- `config.py` owns flags, defaults, WGS84 bounds, and grid limits.
+- `sources.py` owns deterministic Copernicus tile enumeration, raster reprojection, and
+  Sentinel image decoding.
+- `transform.py` owns finite-grid validation plus height and normal quantization.
+- `artifacts.py` owns the `GSP1` wire layout and stable metadata serialization.
+- `cli.py` owns orchestration and user-visible progress output.
+
+The publisher writes NumPy planes through buffer views, preserving the existing little-endian
+layout without extra whole-plane `bytes` copies. Source, validation, and filesystem failures
+remain explicit and retain the CLI's nonzero uncaught-exception behavior.
