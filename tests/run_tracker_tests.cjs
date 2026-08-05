@@ -27,6 +27,7 @@ const mapPage = read('dist/map.html');
 const bundle = read('dist/client.js');
 const mainSource = read('src/ts/main.ts');
 const mapSource = read('src/ts/core/MapController.ts');
+const vectorLayerSource = read('src/ts/core/VectorLayerData.ts');
 const geosplatSource = read('src/ts/core/GeosplatLayer.ts');
 const catalogFunction = read('functions/api/catalog.ts');
 const workerMiddleware = read('functions/api/_engine.ts');
@@ -245,7 +246,7 @@ assert.equal(
 );
 assert.match(catalogFunction, /frameCoverage\(/, 'live catalog must mark frames from the persistence window');
 assert.doesNotMatch(catalogFunction, /framesWithData/, 'exact-frame-only matching must not return');
-assert.match(mapSource, /featureAge/, 'renderer must honour per-detection ages over per-layer ages');
+assert.match(vectorLayerSource, /featureAge/, 'renderer must honour per-detection ages over per-layer ages');
 
 assert.match(ncnnBuild, /-std=c\+\+26/, 'ncnn executor must compile as C++26');
 assert.match(ncnnSource, /use_vulkan_compute = true/, 'ncnn executor must require Vulkan compute');
