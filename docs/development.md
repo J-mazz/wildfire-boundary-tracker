@@ -36,8 +36,11 @@ The shared foundation modules are:
 - `wildfire.memory`: allocator-injected bounded arena, PMR resource, aligned slab pool,
   optional allocation telemetry/high-water marks, and host/Worker/browser/native layouts.
 
-They compile and link into each target but existing FIRMS, geosplat, and ncnn domain logic
-does not use them yet.
+The FIRMS graph is rooted at `wildfire.firms.engine`. Focused named modules own its record
+model and arena-backed state, numeric parsing, Gregorian time parsing, CSV tokenization,
+column resolution, ingestion, ordering/deduplication, and footprint growth. The non-module
+`src/cpp/firms_engine.cpp` file owns only the stable C ABI and one bounded singleton adapter
+per Wasm instance. Geosplat and ncnn remain independent domain targets.
 
 ## WebAssembly
 
@@ -61,7 +64,8 @@ requests.
 ## Characterization and performance gates
 
 `npm run test:cpp` runs assert-based host tests for module helpers, allocator exhaustion and
-reset semantics, the FIRMS record ABI/parser boundary cases, and geosplat binary decoding.
+reset semantics, quoted/malformed CSV, Gregorian and numeric boundaries, FIRMS capacity and
+record ABI behavior, and geosplat binary decoding.
 The Node test entry point separately runs deployment/source, Worker Wasm ABI, and TypeScript
 behavior suites.
 
@@ -71,18 +75,19 @@ npm run benchmark:cpp
 
 The FIRMS parse/sort/dedupe and geosplat decode harnesses write
 `build/benchmarks/cpp-current.json`, including throughput, allocation or working-set
-high-water, reserved storage, and executable-size metrics. FIRMS is static-storage-only, so
-its reserved and occupied storage are measured instead of claiming an unobservable heap
-allocation count. `benchmarks/cpp_baseline.json` owns the comparison
+high-water, reserved storage, and executable-size metrics. FIRMS reserves one fixed adapter
+arena and obtains both its input and record regions through `wildfire.memory`; its reserved
+and occupied storage are measured instead of claiming an unobservable heap allocation count.
+`benchmarks/cpp_baseline.json` owns the comparison
 directions and tolerances. Update that baseline only after reviewing an intentional ratchet;
 the comparison tool has no performance limits compiled into its code. Throughput is reported
 with a wide warning ratchet because shared CI hardware is noisy; deterministic allocation,
 memory, complexity, and binary-size regressions fail the build.
 
-`npm run check:cpp-complexity` measures the new foundation, host harnesses, and
-characterized domain files with a limit of 10. The three pre-existing FIRMS parser
-exceptions are isolated in `benchmarks/cpp_complexity_baseline.json` and may not increase;
-domain decomposition is intentionally deferred beyond this foundation layer.
+`npm run check:cpp-complexity` measures the foundation, FIRMS modules, host harnesses, and
+characterized domain files with a limit of 10. FIRMS has no complexity exceptions;
+`benchmarks/cpp_complexity_baseline.json` remains the explicit ratchet for any characterized
+domain exception.
 
 ## ncnn and Vulkan
 
