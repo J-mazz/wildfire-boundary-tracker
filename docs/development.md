@@ -30,8 +30,20 @@ The shared foundation modules are:
 - `wildfire.memory`: allocator-injected bounded arena, PMR resource, aligned slab pool,
   optional allocation telemetry/high-water marks, and host/Worker/browser/native layouts.
 
-They compile and link into each target but existing FIRMS, geosplat, and ncnn domain logic
-does not use them yet.
+The native executable adds four modules:
+
+- `wildfire.tensor`: checked NCT1/NCO1 layouts and little-endian file I/O without ncnn types.
+- `wildfire.inference.options`: declarative flags, typed validation, defaults, paths, and
+  stable CLI exit mapping.
+- `wildfire.inference.scheduler`: total CPU-budget partitioning, a PMR bounded FIFO, ordered
+  reports, and scheduler allocation sizing.
+- `wildfire.inference.runtime`: ncnn/Vulkan ownership, pool allocators, model loading, and
+  concurrent extraction. ncnn and Vulkan headers occur only in this implementation unit.
+
+FIRMS and geosplat retain their existing storage strategies. The native scheduler injects a
+`wildfire.memory::ArenaResource` with no upstream fallback into its queue and report
+containers; allocation telemetry therefore covers those app structures. ncnn tensor storage
+uses explicit thread-safe `ncnn::PoolAllocator` instances for blob and workspace memory.
 
 ## WebAssembly
 
@@ -63,7 +75,8 @@ behavior suites.
 npm run benchmark:cpp
 ```
 
-The FIRMS parse/sort/dedupe and geosplat decode harnesses write
+The FIRMS parse/sort/dedupe, geosplat decode, native tensor I/O, and native scheduler
+harnesses write
 `build/benchmarks/cpp-current.json`, including throughput, allocation or working-set
 high-water, reserved storage, and executable-size metrics. FIRMS is static-storage-only, so
 its reserved and occupied storage are measured instead of claiming an unobservable heap
@@ -73,7 +86,7 @@ the comparison tool has no performance limits compiled into its code. Throughput
 with a wide warning ratchet because shared CI hardware is noisy; deterministic allocation,
 memory, complexity, and binary-size regressions fail the build.
 
-`npm run check:cpp-complexity` measures the new foundation, host harnesses, and
+`npm run check:cpp-complexity` measures the foundation, native modules, host harnesses, and
 characterized domain files with a limit of 10. The three pre-existing FIRMS parser
 exceptions are isolated in `benchmarks/cpp_complexity_baseline.json` and may not increase;
 domain decomposition is intentionally deferred beyond this foundation layer.
@@ -89,7 +102,9 @@ npm run build:ncnn
 ```
 
 The executor accepts converted ncnn `.param` and `.bin` model shards plus one or more
-NCT1 float32 input tensors. It dispatches tensors through concurrent extractors:
+NCT1 float32 input tensors. All existing flags and defaults are retained: `--device` defaults
+to `0`, `--workers` defaults to `2` and accepts `1..32`, and `--list-devices` still requires
+Vulkan initialization. It dispatches tensors through concurrent extractors:
 
 ```bash
 bash tools/run_sam2_ncnn.sh \
@@ -101,15 +116,35 @@ bash tools/run_sam2_ncnn.sh \
   INPUT_1.nct INPUT_2.nct
 ```
 
-The current native CLI preserves its original behavior of assigning
-`hardware_concurrency()` threads to every extractor. With multiple `--workers`, that can
-oversubscribe the CPU by `workers * hardware_concurrency`. The later native modularization
-phase must add an explicit total/per-extractor thread budget (coordinated with target memory
-layout configuration) rather than changing this foundation PR's CLI behavior.
+`hardware_concurrency()` is one total CPU budget, not a per-extractor setting. Active
+extractors are capped by requested workers, pending inputs, and that total. The scheduler
+divides the budget as evenly as possible, gives every extractor at least one thread, and
+assigns any remainder to lower worker indexes. For example, three workers on eight logical
+CPUs receive `3,3,2`, never `8,8,8`. Work completion may be concurrent, but failures and the
+final report are emitted in original input order.
 
-NCT1 is five little-endian `uint32` values (`magic`, width, height, channels, elements)
-followed by channel-major float32 data. Outputs use the NCO1 header documented by
-`src/native/ncnn_vulkan_batch.cpp`.
+NCT1 is five little-endian `uint32` values (`"NCT1"`, width, height, channels, elements)
+followed by channel-major little-endian float32 data. NCO1 is seven little-endian `uint32`
+values (`"NCO1"`, dimensions, width, height, depth, channels, elements) followed by the
+unpacked little-endian float32 storage returned by ncnn. Its element count remains
+`ncnn::Mat::total()` for binary compatibility and may include ncnn channel-stride padding.
+Checked products reject zero, inconsistent, overflowing, or truncated inputs before ncnn
+receives them. Packed NCT1 channels are read directly into each ncnn `cstep`, so aligned
+pool storage does not shift later channels. Outputs whose storage is smaller than their
+logical dimensions are rejected.
+
+Host coverage does not require ncnn or Vulkan:
+
+```bash
+npm run test:cpp
+npm run benchmark:cpp
+```
+
+On a provisioned publisher, `npm run test:ncnn-integration` builds the native target, checks
+CLI exit behavior, enumerates Vulkan devices, and optionally runs one real model/input smoke
+inference when all `WILDFIRE_NCNN_*` paths and tensor names are set. This repository does not
+bundle those model assets. A machine without the project-local ncnn install, its pkg-config
+metadata, and a Vulkan device cannot compile or run that integration hook.
 
 Model conversion is an explicit preparation step and converted weights are not committed.
 The tracker does not include a Python inference backend or silently fall back from Vulkan.

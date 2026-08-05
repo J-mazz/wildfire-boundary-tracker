@@ -9,7 +9,11 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const tests = [
   ['host-core-memory-tests', 'build/cpp/host-core-memory-tests/core_memory_tests'],
   ['host-firms-tests', 'build/cpp/host-firms-tests/firms_engine_tests'],
-  ['host-geosplat-tests', 'build/cpp/host-geosplat-tests/geosplat_tests']
+  ['host-geosplat-tests', 'build/cpp/host-geosplat-tests/geosplat_tests'],
+  [
+    'host-native-inference-tests',
+    'build/cpp/host-native-inference-tests/native_inference_tests'
+  ]
 ];
 
 function run(command, args) {
@@ -23,4 +27,4 @@ for (const [target, executable] of tests) {
   run(path.join(root, executable), []);
 }
 
-console.log('C++ module, memory, FIRMS, and geosplat host tests passed.');
+console.log('C++ module, memory, FIRMS, geosplat, and native inference host tests passed.');

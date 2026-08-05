@@ -18,6 +18,7 @@
     "test:map-controller": "node tests/map_controller_collaborators.cjs",
     "test:ts": "node tests/run_ts_unit_tests.cjs",
     "test:worker": "node tests/worker_engine_modules_test.cjs",
+    "test:ncnn-integration": "bash tools/test_ncnn_vulkan.sh",
     "test": "npm run build:pages && npm run typecheck && npm run test:cpp && npm run test:ts && npm run test:map-controller && npm run test:worker && node tests/run_tracker_tests.cjs",
     "test:cpp": "npm run check:cpp-complexity && node tools/run_cpp_tests.mjs"
   },
