@@ -1,11 +1,17 @@
 #include "boundary_fixtures.hpp"
 
 #include <cassert>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
+#include <string>
 #include <string_view>
+
+import wildfire.firms.engine;
+import wildfire.memory;
 
 extern "C" {
 std::uint8_t* firms_input();
@@ -71,6 +77,53 @@ void test_header_validation() {
     assert(ingest("latitude,longitude\n42,-116") == -2);
 }
 
+void test_quoted_crlf_and_reordered_columns() {
+    constexpr std::string_view csv =
+        "\"satellite\",\"acq_time\",\"longitude\",\"acq_date\",\"latitude\",\"frp\",\"instrument\"\r\n"
+        "\"N\"\"20\",\"0001\",\"-116.5\",\"2000-02-29\",\"42.5\",\"12.5\",\"VIIRS\"\r\n";
+    firms_reset();
+    assert(ingest(csv) == 1);
+    const auto* records = static_cast<const DetectionRecord*>(firms_records());
+    assert(records[0].latitude == 42.5);
+    assert(records[0].longitude == -116.5);
+    assert(records[0].frp_mw == 12.5f);
+    assert(std::strcmp(records[0].satellite, "N\"20") == 0);
+    assert(std::strcmp(records[0].instrument, "VIIRS") == 0);
+    assert(std::isnan(records[0].brightness_i4_k));
+}
+
+void test_malformed_quotes_and_sparse_rows() {
+    firms_reset();
+    assert(ingest(
+        "latitude,longitude,acq_date,acq_time,satellite,frp\n"
+        "\"42\",\"-116\",\"2026-01-01\",\"0000\n"
+        "42,-116,2026-01-01,0000\n"
+    ) == 1);
+    const auto* records = static_cast<const DetectionRecord*>(firms_records());
+    assert(records[0].satellite[0] == '\0');
+    assert(std::isnan(records[0].frp_mw));
+
+    firms_reset();
+    assert(ingest(
+        "\"latitude,longitude,acq_date,acq_time\n"
+        "42,-116,2026-01-01,0000\n"
+    ) == -2);
+}
+
+void test_numeric_and_gregorian_boundaries() {
+    constexpr std::string_view csv =
+        "latitude,longitude,acq_date,acq_time,frp,satellite\n"
+        "0,0,2000-02-29,2359,999999999999999999999999999999999999999,N\n"
+        "0,0,1900-02-29,0000,1,N\n"
+        "999999999999999999999999999999999999999999999999,0,2028-02-29,0000,1,N\n"
+        "0,0,2028-02-29,42949672960,1,N\n";
+    firms_reset();
+    assert(ingest(csv) == 1);
+    const auto* records = static_cast<const DetectionRecord*>(firms_records());
+    assert(std::isnan(records[0].frp_mw));
+    assert(records[0].observed_at_ms == 951868740000LL);
+}
+
 void test_boundary_rows_sort_and_dedupe() {
     firms_reset();
     assert(ingest(wildfire::tests::fixtures::firms_boundary_csv) == 3);
@@ -110,12 +163,67 @@ void test_sort_identity_includes_satellite() {
     assert(firms_bound(3u) - firms_bound(1u) <= 4.0);
 }
 
+void test_record_capacity_and_reset() {
+    std::string csv = "latitude,longitude,acq_date,acq_time\n";
+    constexpr std::string_view row = "0,0,2028-02-29,0000\n";
+    csv.reserve(csv.size() + row.size() * wildfire::firms::kRecordCapacity);
+    for (std::uint32_t index = 0u; index < wildfire::firms::kRecordCapacity; ++index) {
+        csv.append(row);
+    }
+    assert(csv.size() < firms_input_capacity());
+
+    firms_reset();
+    assert(ingest(csv) == static_cast<int>(wildfire::firms::kRecordCapacity));
+    assert(ingest(
+        "latitude,longitude,acq_date,acq_time\n"
+        "1,1,2028-02-29,0001\n"
+    ) == -3);
+    firms_reset();
+    assert(firms_count() == 0u);
+    assert(ingest(
+        "latitude,longitude,acq_date,acq_time\n"
+        "1,1,2028-02-29,0001\n"
+    ) == 1);
+}
+
+void test_allocator_exhaustion_is_explicit() {
+    alignas(16) std::array<std::byte, 1024u> storage{};
+    wildfire::memory::AllocationTelemetry telemetry;
+    wildfire::memory::BoundedArena arena{storage, &telemetry};
+    wildfire::firms::EngineState state{arena};
+    assert(!state.ready());
+    assert(state.input() == nullptr);
+    assert(state.records() == nullptr);
+    assert(telemetry.failed_allocation_count() == 1u);
+    assert(wildfire::firms::ingest_csv(state, 1u) == -1);
+    assert(wildfire::firms::finalize(
+        state,
+        -1.0,
+        -2.0,
+        3.0,
+        4.0,
+        0.1,
+        360.0
+    ) == 0u);
+    assert(state.bounds()[0] == -1.0);
+    assert(state.bounds()[1] == -2.0);
+    assert(state.bounds()[2] == 3.0);
+    assert(state.bounds()[3] == 4.0);
+    state.reset();
+    assert(state.count() == 0u);
+}
+
 } // namespace
 
 int main() {
     test_input_contract();
     test_header_validation();
+    test_quoted_crlf_and_reordered_columns();
+    test_malformed_quotes_and_sparse_rows();
+    test_numeric_and_gregorian_boundaries();
     test_boundary_rows_sort_and_dedupe();
     test_invalid_boundary_rows();
     test_sort_identity_includes_satellite();
+    test_record_capacity_and_reset();
+    test_allocator_exhaustion_is_explicit();
 }
