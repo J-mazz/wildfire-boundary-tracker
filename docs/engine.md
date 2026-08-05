@@ -89,3 +89,10 @@ the C++26 `ncnn-vulkan-batch` executable on Vulkan-capable native publishers. Mu
 input tensors are dispatched through concurrent ncnn extractors, and immutable output
 assets are published before a catalog swap. Cloudflare continues serving the last valid
 assets while a publisher is unavailable.
+
+The native entrypoint delegates to named tensor, options, scheduler, and runtime modules.
+The scheduler owns a bounded allocator-injected FIFO and input-ordered reports. One detected
+logical-CPU budget is split across active extractors, preventing the previous
+`workers * hardware_concurrency()` oversubscription. The runtime owns Vulkan, the ncnn
+network, and thread-safe blob/workspace pools in explicit destruction order; there is no CPU
+or Python fallback when Vulkan initialization or device selection fails.

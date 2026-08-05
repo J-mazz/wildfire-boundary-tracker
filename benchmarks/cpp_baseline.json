@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "description": "Foundation baseline captured with Clang 21, C++26, x86-64, -O3",
+  "description": "C++26 module baseline captured with Clang 21, x86-64, -O3",
   "benchmarks": [
     {
       "benchmark": "firms_parse_sort_dedupe",
@@ -91,6 +91,64 @@
           "gate": true
         },
         "storage_limit_bytes": {
+          "direction": "lower",
+          "toleranceRatio": 0,
+          "gate": true
+        },
+        "binary_size_bytes": {
+          "direction": "lower",
+          "toleranceRatio": 0.15,
+          "gate": true
+        }
+      }
+    },
+    {
+      "benchmark": "native_tensor_io",
+      "throughput_bytes_per_second": 9982280000,
+      "buffer_bytes": 1048576,
+      "binary_size_bytes": 32176,
+      "ratchets": {
+        "throughput_bytes_per_second": {
+          "direction": "higher",
+          "toleranceRatio": 0.5,
+          "gate": false
+        },
+        "buffer_bytes": {
+          "direction": "lower",
+          "toleranceRatio": 0,
+          "gate": true
+        },
+        "binary_size_bytes": {
+          "direction": "lower",
+          "toleranceRatio": 0.15,
+          "gate": true
+        }
+      }
+    },
+    {
+      "benchmark": "native_scheduler",
+      "throughput_jobs_per_second": 4580070,
+      "allocation_count": 65539,
+      "allocation_high_water_bytes": 20447360,
+      "reserved_storage_bytes": 33558528,
+      "binary_size_bytes": 44144,
+      "ratchets": {
+        "throughput_jobs_per_second": {
+          "direction": "higher",
+          "toleranceRatio": 0.5,
+          "gate": false
+        },
+        "allocation_count": {
+          "direction": "lower",
+          "toleranceRatio": 0,
+          "gate": true
+        },
+        "allocation_high_water_bytes": {
+          "direction": "lower",
+          "toleranceRatio": 0,
+          "gate": true
+        },
+        "reserved_storage_bytes": {
           "direction": "lower",
           "toleranceRatio": 0,
           "gate": true

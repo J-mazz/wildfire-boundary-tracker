@@ -7,11 +7,12 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const maximumComplexity = 10;
-const roots = ['src/cpp/modules', 'tests/cpp', 'benchmarks/cpp'];
+const roots = ['src/cpp/modules', 'src/native/modules', 'tests/cpp', 'benchmarks/cpp'];
 const characterizedDomainFiles = [
   'src/cpp/firms_engine.cpp',
   'src/cpp/geosplat.cppm',
-  'src/cpp/geosplat.cpp'
+  'src/cpp/geosplat.cpp',
+  'src/native/ncnn_vulkan_batch.cpp'
 ];
 const baseline = JSON.parse(fs.readFileSync(
   path.join(root, 'benchmarks/cpp_complexity_baseline.json'),
