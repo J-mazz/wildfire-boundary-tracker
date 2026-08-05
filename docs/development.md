@@ -23,7 +23,9 @@ Every target compiles with Clang `-fmodules`. The graph builds the toolchain's s
 library module first, and project module units use `import std;` instead of textual standard
 library includes. The driver locates libc++'s `std.cppm` or libstdc++'s `bits/std.cc`;
 set `CXX_STDLIB_MODULE_SOURCE` and, when its `std/*.inc` fragments live separately,
-`CXX_STDLIB_MODULE_INCLUDE` when using a nonstandard toolchain layout.
+`CXX_STDLIB_MODULE_INCLUDE` when using a nonstandard toolchain layout. Set
+`CXX_HOST_STDLIB=libc++` or `libstdc++` to select a host library explicitly; CI installs
+libc++ 18 module sources/headers and compiles them with pinned Clang 21.
 The only textual includes in a project module unit are ncnn/Vulkan headers in the native
 runtime implementation's global module fragment; they are never exported through its BMI.
 

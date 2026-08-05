@@ -39,8 +39,10 @@ const incidentsFunction = read('functions/api/incidents.ts');
 const perimeterFunction = read('functions/api/perimeter.ts');
 const httpMiddleware = read('functions/api/_http.ts');
 const ncnnSource = read('src/native/ncnn_vulkan_batch.cpp');
+const ncnnRuntimeSource = read('src/native/modules/wildfire.inference.runtime.cpp');
 const cppBuildDriver = read('tools/cpp_build.mjs');
 const cppManifest = JSON.parse(read('tools/cpp_build_manifest.json'));
+const ciWorkflow = read('.github/workflows/deploy-pages.yml');
 
 assert.match(landing, /Current wildfires/, 'root must be the NIFC incident picker');
 assert.match(landing, /fires\.js/, 'landing page script missing');
@@ -65,6 +67,9 @@ assert.match(bundle, /wildfire-geosplat/, 'geosplat renderer was not bundled');
 assert.equal(cppManifest.standard, 'c++26', 'C++ build graph must compile as C++26');
 assert.equal(cppManifest.modules.std.kind, 'standard-library', 'standard library module missing');
 assert.match(cppBuildDriver, /'-fmodules'/, 'C++ targets must enable Clang modules');
+assert.match(cppBuildDriver, /CXX_HOST_STDLIB/, 'host standard library selection missing');
+assert.match(ciWorkflow, /CXX_HOST_STDLIB: libc\+\+/, 'CI must select the installed libc++ module');
+assert.match(ciWorkflow, /libc\+\+-18-dev libc\+\+abi-18-dev/, 'CI libc++ module packages missing');
 for (const [moduleName, definition] of Object.entries(cppManifest.modules)) {
   if (definition.kind === 'standard-library') continue;
   assert.ok(definition.imports.includes('std'), `${moduleName} must import std`);
@@ -145,8 +150,9 @@ for (const endpoint of ['_engine', 'catalog', 'firms', 'incidents', 'perimeter']
 assert.match(catalogBuilder, /frameCoverage\(/, 'live catalog must mark frames from the persistence window');
 assert.doesNotMatch(catalogSources, /framesWithData/, 'exact-frame-only matching must not return');
 assert.match(vectorLayerSource, /featureAge/, 'renderer must honour per-detection ages over per-layer ages');
-assert.match(ncnnSource, /use_vulkan_compute = true/, 'ncnn executor must require Vulkan compute');
-assert.match(ncnnSource, /std::jthread/, 'ncnn executor must dispatch concurrent jobs');
+assert.match(ncnnRuntimeSource, /use_vulkan_compute = true/, 'ncnn executor must require Vulkan compute');
+assert.match(ncnnRuntimeSource, /std::jthread/, 'ncnn executor must dispatch concurrent jobs');
+assert.match(ncnnSource, /run_native/, 'ncnn entrypoint must delegate to the native runtime module');
 assert.ok(!exists('tools/process_hotspot_sam2.py'), 'sequential Python SAM-2 implementation remains');
 
 console.log('Deployment, build graph, and source contracts passed.');

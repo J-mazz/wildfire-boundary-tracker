@@ -17,6 +17,7 @@ concurrency:
 env:
   EM_VERSION: 6.0.3
   LLVM_VERSION: 21.1.8
+  CXX_HOST_STDLIB: libc++
   CLOUDFLARE_PAGES_PROJECT: wildfire-boundary-tracker
 
 jobs:
@@ -48,6 +49,11 @@ jobs:
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: ${{ env.LLVM_VERSION }}
+
+      - name: Install standard library module support
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libc++-18-dev libc++abi-18-dev
 
       - name: Install dependencies
         run: npm ci
