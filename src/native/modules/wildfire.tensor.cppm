@@ -1,12 +1,6 @@
-module;
-
-#include <cstddef>
-#include <cstdint>
-#include <filesystem>
-#include <span>
-#include <string>
-
 export module wildfire.tensor;
+
+import std;
 
 export namespace wildfire::tensor {
 

@@ -55,9 +55,13 @@ serialization, and catalog construction. `functions/api/_engine.ts` remains a
 compatibility re-export facade. The compute module is `src/cpp/firms_engine.cpp` and
 builds to `functions/wasm/firms_engine.wasm`.
 
-The module-aware graph also compiles `wildfire.core` and `wildfire.memory` into the target
-as an unused foundation layer. FIRMS still owns its existing static buffers and record ABI;
-allocator migration is intentionally deferred to a later behavior-preserving phase.
+`src/cpp/firms_engine.cpp` is a thin, non-module C ABI adapter. The implementation graph under
+`src/cpp/modules/` separates `wildfire.firms.model`, `.numbers`, `.time`, `.csv`, `.schema`,
+`.ingest`, `.order`, `.footprint`, and the `.engine` facade. Model owns the fixed 64-byte ABI
+record and an explicit `EngineState`; the adapter injects a `wildfire.memory::BoundedArena`
+whose fixed storage holds the 8 MiB input region and 131,072-record arena. Allocation failure
+is deterministic, there is no heap fallback or global `new`/`delete` override, and each fresh
+Wasm instance retains the same request-local singleton semantics.
 
 ## FIRMS quota protection
 

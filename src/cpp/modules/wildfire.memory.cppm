@@ -1,12 +1,6 @@
-module;
-
-#include <cstddef>
-#include <cstdint>
-#include <memory_resource>
-#include <span>
-
 export module wildfire.memory;
 
+import std;
 import wildfire.core;
 
 export namespace wildfire::memory {
@@ -42,7 +36,7 @@ public:
 
     [[nodiscard]] void* allocate(
         std::size_t bytes,
-        std::size_t alignment = alignof(std::max_align_t)
+        std::size_t alignment = wildfire::core::default_new_alignment
     ) noexcept;
     void reset() noexcept;
 
@@ -57,6 +51,45 @@ private:
     std::size_t offset_{};
     std::size_t high_water_{};
     std::size_t live_bytes_{};
+};
+
+using AllocateFunction = void* (*)(std::size_t) noexcept;
+using DeallocateFunction = void (*)(void*) noexcept;
+
+class ExactAllocation {
+public:
+    ExactAllocation(
+        std::size_t byte_limit,
+        AllocateFunction allocate,
+        DeallocateFunction deallocate,
+        AllocationTelemetry* telemetry = nullptr
+    ) noexcept;
+    ~ExactAllocation();
+
+    ExactAllocation(const ExactAllocation&) = delete;
+    ExactAllocation& operator=(const ExactAllocation&) = delete;
+
+    [[nodiscard]] void* acquire(std::size_t bytes) noexcept;
+    [[nodiscard]] void* replace(std::size_t bytes) noexcept;
+    [[nodiscard]] bool release(std::uint32_t generation) noexcept;
+    void reset() noexcept;
+
+    [[nodiscard]] void* data() const noexcept;
+    [[nodiscard]] std::size_t size() const noexcept;
+    [[nodiscard]] std::size_t byte_limit() const noexcept;
+    [[nodiscard]] std::uint32_t generation() const noexcept;
+
+private:
+    [[nodiscard]] bool valid_request(std::size_t bytes) noexcept;
+    void advance_generation() noexcept;
+
+    AllocateFunction allocate_;
+    DeallocateFunction deallocate_;
+    AllocationTelemetry* telemetry_{};
+    void* data_{};
+    std::size_t size_{};
+    std::size_t byte_limit_{};
+    std::uint32_t generation_{};
 };
 
 class ArenaResource final : public std::pmr::memory_resource {

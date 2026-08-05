@@ -1,18 +1,6 @@
-module;
-
-#include <array>
-#include <bit>
-#include <cstddef>
-#include <cstdint>
-#include <cstring>
-#include <filesystem>
-#include <fstream>
-#include <limits>
-#include <span>
-#include <string>
-
 module wildfire.tensor;
 
+import std;
 import wildfire.core;
 
 namespace wildfire::tensor {

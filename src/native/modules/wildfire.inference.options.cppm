@@ -1,12 +1,6 @@
-module;
-
-#include <filesystem>
-#include <span>
-#include <string>
-#include <string_view>
-#include <vector>
-
 export module wildfire.inference.options;
+
+import std;
 
 export namespace wildfire::inference {
 

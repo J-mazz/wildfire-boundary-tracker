@@ -35,6 +35,10 @@ padding; preserving it keeps the publisher binary-compatible with existing outpu
 retain input order by filename (`INPUT.nct.nco`), and a batch returns exit code `6` if any
 input, inference, or output operation fails.
 
+Geosplat payloads use the little-endian `GSP1` layout documented in
+[`docs/geosplat-runtime.md`](geosplat-runtime.md). Browser decoding rejects non-exact payload
+lengths and grids above 4,194,304 splats.
+
 ## Production notes
 
 - **Base imagery** is selected by the live catalog. The CSP currently allows the default

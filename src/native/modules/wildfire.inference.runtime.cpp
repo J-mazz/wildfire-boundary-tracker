@@ -3,24 +3,9 @@ module;
 #include <ncnn/gpu.h>
 #include <ncnn/net.h>
 
-#include <algorithm>
-#include <cstddef>
-#include <cstdint>
-#include <exception>
-#include <filesystem>
-#include <iostream>
-#include <limits>
-#include <memory_resource>
-#include <mutex>
-#include <new>
-#include <span>
-#include <string>
-#include <string_view>
-#include <thread>
-#include <vector>
-
 module wildfire.inference.runtime;
 
+import std;
 import wildfire.inference.options;
 import wildfire.inference.scheduler;
 import wildfire.memory;

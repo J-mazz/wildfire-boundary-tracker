@@ -1,30 +1,28 @@
-module;
-
-#include <cerrno>
-#include <cstdlib>
-#include <filesystem>
-#include <limits>
-#include <span>
-#include <string>
-#include <string_view>
-#include <vector>
-
 module wildfire.inference.options;
+
+import std;
 
 namespace wildfire::inference {
 
 namespace {
 
 bool parse_integer(const std::string_view text, int& value) {
-    if (text.empty()) return false;
-    const std::string terminated{text};
-    char* end{};
-    errno = 0;
-    const long parsed = std::strtol(terminated.c_str(), &end, 10);
-    if (errno == ERANGE || end == terminated.c_str() || *end != '\0'
-        || parsed < std::numeric_limits<int>::min()
-        || parsed > std::numeric_limits<int>::max()) return false;
-    value = static_cast<int>(parsed);
+    std::string_view normalized = text;
+    while (!normalized.empty()
+        && std::isspace(static_cast<unsigned char>(normalized.front())) != 0) {
+        normalized.remove_prefix(1u);
+    }
+    if (!normalized.empty() && normalized.front() == '+') normalized.remove_prefix(1u);
+    if (normalized.empty()) return false;
+
+    int parsed{};
+    const auto [end, error] = std::from_chars(
+        normalized.data(),
+        normalized.data() + normalized.size(),
+        parsed
+    );
+    if (error != std::errc{} || end != normalized.data() + normalized.size()) return false;
+    value = parsed;
     return true;
 }
 

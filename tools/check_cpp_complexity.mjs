@@ -11,6 +11,7 @@ const roots = ['src/cpp/modules', 'src/native/modules', 'tests/cpp', 'benchmarks
 const characterizedDomainFiles = [
   'src/cpp/firms_engine.cpp',
   'src/cpp/geosplat.cppm',
+  'src/cpp/geosplat.cpp',
   'src/native/ncnn_vulkan_batch.cpp'
 ];
 const baseline = JSON.parse(fs.readFileSync(

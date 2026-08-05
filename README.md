@@ -18,7 +18,8 @@ setup is required.
 	This is an asynchronous publisher, never a request-time Python backend.
 - **Shared C++26 foundation**: `wildfire.core` provides checked bounded/endian helpers and
 	`wildfire.memory` provides bounded arenas, a slab pool, PMR integration, telemetry, and
-	target memory layouts. Native scheduling uses allocator-injected bounded queues and reports.
+	target memory layouts. FIRMS and native scheduling use injected bounded storage with no
+	hidden heap fallback.
 
 Every rendered layer comes from real observations. Nothing is fabricated.
 

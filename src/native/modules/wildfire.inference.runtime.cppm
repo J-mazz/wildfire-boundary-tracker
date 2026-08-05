@@ -1,7 +1,6 @@
-module;
-
 export module wildfire.inference.runtime;
 
+import std;
 import wildfire.inference.options;
 
 export namespace wildfire::inference {

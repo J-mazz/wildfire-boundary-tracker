@@ -168,11 +168,22 @@ export class MapController {
     const metadataUrl = this.terrainMetadataUrl!;
     this.geosplatLoading ??= GeosplatLayer.load(metadataUrl, this.errorHandler);
     const loaded = await this.geosplatLoading;
-    if (metadataUrl !== this.terrainMetadataUrl) return false;
+    if (metadataUrl !== this.terrainMetadataUrl) {
+      loaded?.dispose();
+      return false;
+    }
     this.geosplat = loaded;
     if (!this.geosplat) return false;
     const beforeId = CONTEXT_LINE_LAYERS.find((id) => this.map.getLayer(id));
-    this.map.addLayer(this.geosplat, beforeId);
+    try {
+      this.map.addLayer(this.geosplat, beforeId);
+    } catch (error) {
+      if (this.map.getLayer(this.geosplat.id)) this.map.removeLayer(this.geosplat.id);
+      this.geosplat.dispose();
+      this.geosplat = null;
+      this.geosplatLoading = null;
+      throw error;
+    }
     return true;
   }
 }

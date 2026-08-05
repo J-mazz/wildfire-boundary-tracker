@@ -1,12 +1,6 @@
-module;
-
-#include <bit>
-#include <cstddef>
-#include <cstdint>
-#include <limits>
-#include <span>
-
 module wildfire.core;
+
+import std;
 
 namespace wildfire::core {
 

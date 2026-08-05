@@ -1,15 +1,6 @@
-module;
-
-#include <array>
-#include <cstddef>
-#include <memory_resource>
-#include <mutex>
-#include <span>
-#include <string>
-#include <string_view>
-#include <vector>
-
 export module wildfire.inference.scheduler;
+
+import std;
 
 export namespace wildfire::inference {
 
