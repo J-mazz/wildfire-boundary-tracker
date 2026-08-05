@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "description": "Ratchet-only exceptions for pre-existing FIRMS domain functions deferred from the foundation layer",
+  "exceptions": {
+    "src/cpp/firms_engine.cpp:parse_double": 14,
+    "src/cpp/firms_engine.cpp:parse_observed_at": 12,
+    "src/cpp/firms_engine.cpp:split_csv_line": 14
+  }
+}

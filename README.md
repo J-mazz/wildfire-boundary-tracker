@@ -15,6 +15,9 @@ setup is required.
 	decoding and rendering support.
 - **C++26 ncnn/Vulkan**: native, concurrent inference for converted SAM-2 model shards.
 	This is an asynchronous publisher, never a request-time Python backend.
+- **Shared C++26 foundation**: `wildfire.core` provides checked bounded/endian helpers and
+	`wildfire.memory` provides bounded arenas, a slab pool, PMR integration, telemetry, and
+	target memory layouts. Existing domain engines are not migrated onto these allocators yet.
 
 Every rendered layer comes from real observations. Nothing is fabricated.
 
@@ -33,4 +36,3 @@ Every rendered layer comes from real observations. Nothing is fabricated.
 
 The curated East Evans Creek visualization remains in
 [fire-progression-NRTDV](https://github.com/J-mazz/fire-progression-NRTDV).
-

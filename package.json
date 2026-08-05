@@ -4,6 +4,7 @@
   "version": "0.0.1",
   "scripts": {
     "build": "bash build.sh",
+    "build:cpp-host": "node tools/cpp_build.mjs host-core-memory-tests",
     "build:ncnn": "bash tools/build_ncnn_vulkan.sh",
     "build:pages": "bash tools/build_pages.sh",
     "build:wasm": "bash tools/build_wasm.sh",
@@ -12,7 +13,10 @@
     "dev": "npm run build:pages && wrangler pages dev dist --env-file .env.local",
     "types": "wrangler types --env-file .dev.vars.example",
     "typecheck": "wrangler types --env-file .dev.vars.example --check && tsc --noEmit && tsc -p tsconfig.functions.json",
-    "test": "npm run build:pages && npm run typecheck && node tests/run_tracker_tests.cjs"
+    "benchmark:cpp": "node tools/run_cpp_benchmarks.mjs && node tools/compare_cpp_benchmarks.mjs benchmarks/cpp_baseline.json build/benchmarks/cpp-current.json --enforce",
+    "check:cpp-complexity": "node tools/check_cpp_complexity.mjs",
+    "test": "npm run build:pages && npm run typecheck && npm run test:cpp && node tests/run_tracker_tests.cjs",
+    "test:cpp": "npm run check:cpp-complexity && node tools/run_cpp_tests.mjs"
   },
   "dependencies": {
     "@tmcw/togeojson": "^7.1.2",

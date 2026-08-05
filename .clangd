@@ -1,6 +1,6 @@
 CompileFlags:
-  Add: [-std=c++26, -fmodules-ts, -xc++, -I src/cpp, -I src/generated]
-  Compiler: /usr/bin/g++-16
+  Add: [-std=c++26, -I src/cpp, -I src/cpp/modules, -I src/generated]
+  Compiler: clang++
   Remove: [-m64]
 
 Diagnostics:

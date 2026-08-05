@@ -5,6 +5,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <vector>
+#include <algorithm>
 
 export module wildfire.geosplat;
 
@@ -18,6 +19,11 @@ namespace {
     std::uint16_t g_grid_h = 0;
     float g_min_height = 0.0f;
     float g_max_height = 0.0f;
+
+#if defined(WILDFIRE_BENCHMARK_TELEMETRY)
+    std::size_t g_allocation_count = 0;
+    std::size_t g_allocation_high_water_bytes = 0;
+#endif
 
     template <typename T>
     T read_le(const std::uint8_t* cursor) {
@@ -49,7 +55,19 @@ export namespace wildfire::geosplat {
         const auto* normals = reinterpret_cast<const std::int8_t*>(colors + count * 3);
         const float span = max_height - min_height;
 
+#if defined(WILDFIRE_BENCHMARK_TELEMETRY)
+        const std::size_t previous_capacity = g_instances.capacity();
+#endif
         g_instances.assign(count * kFloatsPerSplat, 0.0f);
+#if defined(WILDFIRE_BENCHMARK_TELEMETRY)
+        g_allocation_count += static_cast<std::size_t>(
+            g_instances.capacity() > previous_capacity
+        );
+        g_allocation_high_water_bytes = std::max(
+            g_allocation_high_water_bytes,
+            g_instances.capacity() * sizeof(float)
+        );
+#endif
         float* out = g_instances.data();
         for (std::size_t index = 0; index < count; ++index) {
             const std::size_t row = index / grid_w;
@@ -91,5 +109,20 @@ export namespace wildfire::geosplat {
         g_instances.shrink_to_fit();
         g_count = 0;
     }
+
+#if defined(WILDFIRE_BENCHMARK_TELEMETRY)
+    void benchmark_reset_telemetry() {
+        g_allocation_count = 0;
+        g_allocation_high_water_bytes = 0;
+    }
+
+    std::size_t benchmark_allocation_count() {
+        return g_allocation_count;
+    }
+
+    std::size_t benchmark_allocation_high_water_bytes() {
+        return g_allocation_high_water_bytes;
+    }
+#endif
 
 } // namespace wildfire::geosplat

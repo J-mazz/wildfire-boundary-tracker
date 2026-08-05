@@ -17,7 +17,7 @@ FIRMS supplies the recurring VIIRS observations that grow it.
 5. TypeScript reads the fixed record ABI with `DataView` and serializes catalog and
   per-frame GeoJSON. It does not parse FIRMS CSV.
 
-The WASM module is import-free, has a fixed 32 MiB heap, and is instantiated per engine
+The WASM module is import-free, has a fixed 20 MiB memory, and is instantiated per engine
 operation so mutable linear memory never crosses requests.
 
 ## Endpoints (Pages Functions)
@@ -51,6 +51,10 @@ All Functions are strict TypeScript. `functions/api/_http.ts` owns timeouts, san
 errors, structured logs, and deferred-operation reporting. Domain logic lives in
 `functions/api/_engine.ts`; the compute module is `src/cpp/firms_engine.cpp` and builds to
 `functions/wasm/firms_engine.wasm`.
+
+The module-aware graph also compiles `wildfire.core` and `wildfire.memory` into the target
+as an unused foundation layer. FIRMS still owns its existing static buffers and record ABI;
+allocator migration is intentionally deferred to a later behavior-preserving phase.
 
 ## FIRMS quota protection
 

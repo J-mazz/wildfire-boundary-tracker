@@ -1,14 +1,37 @@
 # Development
 
-Requires Node.js 22+, Emscripten 6.0.3, a C++26 compiler, and `uv` for offline geospatial
-tools.
+Requires Node.js 22+, Emscripten 6.0.3, Clang 21 for the explicit module build graph, and
+`uv` for offline geospatial tools. CI pins LLVM 21.1.8. Set `CLANGXX` to another modern
+Clang binary for local host builds.
 
 ```bash
 npm install
 uv sync
-npm run typecheck
+npm run test:cpp
 npm test
 ```
+
+## C++26 module graph
+
+`tools/cpp_build_manifest.json` is the source of truth for named-module imports, sources,
+flags, and outputs. `tools/cpp_build.mjs` topologically orders the module interfaces,
+precompiles `.pcm` BMIs, compiles interface and implementation objects with the target's
+optimization flags, and links host, browser Wasm, Worker Wasm, and native ncnn targets.
+BMIs and objects stay under ignored `build/cpp/` directories.
+
+The explicit Clang graph is intentional: Emscripten 6.0.3 support for CMake `CXX_MODULES`
+could not be proven across all four target shapes. The checked-in manifest avoids a second
+hand-maintained dependency order while keeping the npm commands stable.
+
+The shared foundation modules are:
+
+- `wildfire.core`: overflow-checked size arithmetic, alignment, little-endian loads, and a
+  transactional bounded reader.
+- `wildfire.memory`: allocator-injected bounded arena, PMR resource, aligned slab pool,
+  optional allocation telemetry/high-water marks, and host/Worker/browser/native layouts.
+
+They compile and link into each target but existing FIRMS, geosplat, and ncnn domain logic
+does not use them yet.
 
 ## WebAssembly
 
@@ -24,6 +47,32 @@ npm run build:worker-wasm  # import-free FIRMS parser and footprint engine
 the `/api/incidents`, `/api/catalog`, and `/api/firms` paths run in the local loop. It
 loads the uncommitted `.env.local` file, which must define `FIRMS_MAP_KEY` for live VIIRS
 requests.
+
+## Characterization and performance gates
+
+`npm run test:cpp` runs assert-based host tests for module helpers, allocator exhaustion and
+reset semantics, the FIRMS record ABI/parser boundary cases, and geosplat binary decoding.
+The Node test entry point separately runs deployment/source, Worker Wasm ABI, and TypeScript
+behavior suites.
+
+```bash
+npm run benchmark:cpp
+```
+
+The FIRMS parse/sort/dedupe and geosplat decode harnesses write
+`build/benchmarks/cpp-current.json`, including throughput, allocation or working-set
+high-water, reserved storage, and executable-size metrics. FIRMS is static-storage-only, so
+its reserved and occupied storage are measured instead of claiming an unobservable heap
+allocation count. `benchmarks/cpp_baseline.json` owns the comparison
+directions and tolerances. Update that baseline only after reviewing an intentional ratchet;
+the comparison tool has no performance limits compiled into its code. Throughput is reported
+with a wide warning ratchet because shared CI hardware is noisy; deterministic allocation,
+memory, complexity, and binary-size regressions fail the build.
+
+`npm run check:cpp-complexity` measures the new foundation, host harnesses, and
+characterized domain files with a limit of 10. The three pre-existing FIRMS parser
+exceptions are isolated in `benchmarks/cpp_complexity_baseline.json` and may not increase;
+domain decomposition is intentionally deferred beyond this foundation layer.
 
 ## ncnn and Vulkan
 

@@ -37,6 +37,11 @@ alignas(16) DetectionRecord g_records[kRecordCapacity];
 std::uint32_t g_count = 0u;
 double g_bounds[4]{};
 
+#if defined(WILDFIRE_BENCHMARK_TELEMETRY)
+std::size_t g_input_high_water = 0u;
+std::size_t g_record_high_water = 0u;
+#endif
+
 bool equals(const Field field, const char* text) {
     const auto length = static_cast<std::size_t>(field.end - field.begin);
     return std::strlen(text) == length && std::memcmp(field.begin, text, length) == 0;
@@ -235,6 +240,9 @@ void firms_reset() { g_count = 0u; }
 
 int firms_ingest_csv(const std::uint32_t byte_length) {
     if (byte_length == 0u || byte_length > kInputCapacity) return -1;
+#if defined(WILDFIRE_BENCHMARK_TELEMETRY)
+    g_input_high_water = std::max(g_input_high_water, static_cast<std::size_t>(byte_length));
+#endif
     const char* cursor = reinterpret_cast<const char*>(g_input);
     const char* const finish = cursor + byte_length;
     const char* header_end = cursor;
@@ -266,6 +274,9 @@ int firms_ingest_csv(const std::uint32_t byte_length) {
             && longitude >= -180.0 && longitude <= 180.0
             && parse_observed_at(fields[columns.acq_date], fields[columns.acq_time], observed_at_ms)) {
             DetectionRecord& record = g_records[g_count++];
+#if defined(WILDFIRE_BENCHMARK_TELEMETRY)
+            g_record_high_water = std::max(g_record_high_water, static_cast<std::size_t>(g_count));
+#endif
             std::memset(&record, 0, sizeof(record));
             record.latitude = latitude;
             record.longitude = longitude;
@@ -329,5 +340,21 @@ const DetectionRecord* firms_records() { return g_records; }
 std::uint32_t firms_count() { return g_count; }
 std::uint32_t firms_record_stride() { return sizeof(DetectionRecord); }
 double firms_bound(const std::uint32_t index) { return index < 4u ? g_bounds[index] : NAN; }
+
+#if defined(WILDFIRE_BENCHMARK_TELEMETRY)
+void firms_benchmark_reset_telemetry() {
+    g_input_high_water = 0u;
+    g_record_high_water = 0u;
+}
+
+std::size_t firms_benchmark_working_set_high_water() {
+    return g_input_high_water + g_record_high_water * sizeof(DetectionRecord);
+}
+
+std::size_t firms_benchmark_reserved_storage_bytes() {
+    return sizeof(g_input) + sizeof(g_records) + sizeof(g_bounds);
+}
+
+#endif
 
 } // extern "C"

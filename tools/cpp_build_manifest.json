@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "standard": "c++26",
+  "modules": {
+    "wildfire.core": {
+      "interface": "src/cpp/modules/wildfire.core.cppm",
+      "implementation": "src/cpp/modules/wildfire.core.cpp",
+      "imports": []
+    },
+    "wildfire.memory": {
+      "interface": "src/cpp/modules/wildfire.memory.cppm",
+      "implementation": "src/cpp/modules/wildfire.memory.cpp",
+      "imports": ["wildfire.core"]
+    },
+    "wildfire.geosplat": {
+      "interface": "src/cpp/geosplat.cppm",
+      "implementation": null,
+      "imports": []
+    }
+  },
+  "targets": {
+    "host-core-memory-tests": {
+      "toolchain": "host",
+      "modules": ["wildfire.core", "wildfire.memory"],
+      "sources": ["tests/cpp/core_memory_tests.cpp"],
+      "includeDirectories": ["tests/cpp"],
+      "compileFlags": ["-O2", "-Wall", "-Wextra", "-Wpedantic"],
+      "linkFlags": [],
+      "output": "build/cpp/host-core-memory-tests/core_memory_tests"
+    },
+    "host-firms-tests": {
+      "toolchain": "host",
+      "modules": ["wildfire.core", "wildfire.memory"],
+      "sources": ["src/cpp/firms_engine.cpp", "tests/cpp/firms_engine_tests.cpp"],
+      "includeDirectories": ["tests/cpp"],
+      "compileFlags": ["-O2", "-Wall", "-Wextra", "-Wpedantic"],
+      "linkFlags": [],
+      "output": "build/cpp/host-firms-tests/firms_engine_tests"
+    },
+    "host-geosplat-tests": {
+      "toolchain": "host",
+      "modules": ["wildfire.core", "wildfire.memory", "wildfire.geosplat"],
+      "sources": ["tests/cpp/geosplat_tests.cpp"],
+      "includeDirectories": ["tests/cpp"],
+      "compileFlags": ["-O2", "-Wall", "-Wextra", "-Wpedantic"],
+      "linkFlags": [],
+      "output": "build/cpp/host-geosplat-tests/geosplat_tests"
+    },
+    "host-firms-benchmark": {
+      "toolchain": "host",
+      "modules": ["wildfire.core", "wildfire.memory"],
+      "sources": ["src/cpp/firms_engine.cpp", "benchmarks/cpp/firms_benchmark.cpp"],
+      "includeDirectories": [],
+      "compileFlags": ["-O3", "-DNDEBUG", "-DWILDFIRE_BENCHMARK_TELEMETRY", "-Wall", "-Wextra", "-Wpedantic"],
+      "linkFlags": [],
+      "output": "build/cpp/host-firms-benchmark/firms_benchmark"
+    },
+    "host-geosplat-benchmark": {
+      "toolchain": "host",
+      "modules": ["wildfire.core", "wildfire.memory", "wildfire.geosplat"],
+      "sources": ["benchmarks/cpp/geosplat_benchmark.cpp"],
+      "includeDirectories": [],
+      "compileFlags": ["-O3", "-DNDEBUG", "-DWILDFIRE_BENCHMARK_TELEMETRY", "-Wall", "-Wextra", "-Wpedantic"],
+      "linkFlags": [],
+      "output": "build/cpp/host-geosplat-benchmark/geosplat_benchmark"
+    },
+    "browser-wasm": {
+      "toolchain": "emscripten",
+      "modules": ["wildfire.core", "wildfire.memory", "wildfire.geosplat"],
+      "sources": ["src/cpp/main.cpp"],
+      "includeDirectories": ["src/cpp"],
+      "compileFlags": ["-O3", "-DNDEBUG"],
+      "linkFlags": [
+        "-sALLOW_MEMORY_GROWTH=1",
+        "-sINITIAL_MEMORY=33554432",
+        "-sMAXIMUM_MEMORY=268435456",
+        "-sMODULARIZE=1",
+        "-sEXPORT_ES6=1",
+        "-sEXPORT_NAME=createWildfireWasm",
+        "-sENVIRONMENT=web",
+        "-sFILESYSTEM=0",
+        "-sEXPORTED_FUNCTIONS=[\"_ext_allocate_wasm_buffer\",\"_ext_free_wasm_buffer\",\"_geosplat_decode\",\"_geosplat_data\",\"_geosplat_count\",\"_geosplat_floats_per_splat\",\"_geosplat_release\"]",
+        "-sEXPORTED_RUNTIME_METHODS=[\"HEAPU8\"]"
+      ],
+      "output": "public/wasm/wildfire.js",
+      "cleanOutputDirectory": true
+    },
+    "worker-wasm": {
+      "toolchain": "emscripten",
+      "modules": ["wildfire.core", "wildfire.memory"],
+      "sources": ["src/cpp/firms_engine.cpp"],
+      "includeDirectories": [],
+      "compileFlags": ["-O3", "-DNDEBUG"],
+      "linkFlags": [
+        "-sSTANDALONE_WASM=1",
+        "-sFILESYSTEM=0",
+        "-sALLOW_MEMORY_GROWTH=0",
+        "-sINITIAL_MEMORY=20971520",
+        "-sSTACK_SIZE=1048576",
+        "-Wl,--no-entry",
+        "-sEXPORTED_FUNCTIONS=[\"_firms_input\",\"_firms_input_capacity\",\"_firms_reset\",\"_firms_ingest_csv\",\"_firms_finalize\",\"_firms_records\",\"_firms_count\",\"_firms_record_stride\",\"_firms_bound\"]"
+      ],
+      "output": "functions/wasm/firms_engine.wasm"
+    },
+    "native-ncnn": {
+      "toolchain": "host",
+      "modules": ["wildfire.core", "wildfire.memory"],
+      "sources": ["src/native/ncnn_vulkan_batch.cpp"],
+      "includeDirectories": [],
+      "compileFlags": ["-O3", "-march=native", "-DNDEBUG", "-Wall", "-Wextra", "-Wpedantic", "-pthread"],
+      "linkFlags": ["-pthread"],
+      "pkgConfig": ["ncnn"],
+      "rpathEnvironment": "NCNN_ROOT",
+      "output": ".tools/bin/ncnn-vulkan-batch"
+    }
+  }
+}
