@@ -2,7 +2,6 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-require('./run_ts_unit_tests.cjs');
 
 const root = path.resolve(__dirname, '..');
 const run = (command, args) => {

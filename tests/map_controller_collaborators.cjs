@@ -90,6 +90,14 @@ const exerciseVectorCache = async () => {
   await assert.rejects(vectors.load(layer('failure', '/failure')), /returned 503/);
   await assert.rejects(vectors.load(layer('failure-again', '/failure')), /returned 503/);
   assert.equal(calls.filter((url) => url === '/failure').length, 2, 'failed requests must leave the cache');
+  const perimeter = layer('perimeter', '/perimeter', { contextType: 'incident-perimeter' });
+  await vectors.load(perimeter);
+  await vectors.load(perimeter);
+  assert.equal(
+    calls.filter((url) => url === '/perimeter').length,
+    2,
+    'current incident perimeters must not be frozen in the immutable vector cache'
+  );
 
   const merged = await vectors.merge([
     layer('observed', '/observed', { ageHours: 12 }),

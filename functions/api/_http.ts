@@ -24,6 +24,46 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function responseWithDeadline(
+  response: Response,
+  controller: AbortController,
+  timeout: ReturnType<typeof setTimeout>,
+  service: string
+): Response {
+  if (!response.body) {
+    clearTimeout(timeout);
+    return response;
+  }
+  const reader = response.body.getReader();
+  const body = new ReadableStream<Uint8Array>({
+    async pull(stream) {
+      try {
+        const { done, value } = await reader.read();
+        if (done) {
+          clearTimeout(timeout);
+          stream.close();
+        } else {
+          stream.enqueue(value);
+        }
+      } catch (error) {
+        clearTimeout(timeout);
+        stream.error(controller.signal.aborted
+          ? new UpstreamError(service, `timed out after ${UPSTREAM_TIMEOUT_MS}ms`, { cause: error })
+          : error);
+      }
+    },
+    async cancel(reason) {
+      clearTimeout(timeout);
+      await reader.cancel(reason);
+    }
+  });
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers
+  });
+}
+
 function logError(level: 'error' | 'warn', event: string, error: unknown, details: Record<string, unknown> = {}): void {
   console[level](JSON.stringify({
     level,
@@ -67,13 +107,12 @@ export async function fetchUpstream(
   try {
     const response = await fetch(input, { ...init, signal: controller.signal });
     if (!response.ok) throw new UpstreamError(service, `HTTP ${response.status}`);
-    return response;
+    return responseWithDeadline(response, controller, timeout, service);
   } catch (error) {
+    clearTimeout(timeout);
     if (error instanceof UpstreamError) throw error;
     const detail = controller.signal.aborted ? `timed out after ${UPSTREAM_TIMEOUT_MS}ms` : errorText(error);
     throw new UpstreamError(service, detail, { cause: error });
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
@@ -86,6 +125,7 @@ export async function upstreamJson(
   try {
     return await response.json();
   } catch (error) {
+    if (error instanceof UpstreamError) throw error;
     throw new UpstreamError(service, 'returned invalid JSON', { cause: error });
   }
 }

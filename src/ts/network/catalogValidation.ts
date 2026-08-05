@@ -21,15 +21,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function finiteTuple(value: unknown, length: number): value is number[] {
-  return Array.isArray(value)
-    && value.length === length
-    && value.every((entry) => typeof entry === 'number' && Number.isFinite(entry));
+  if (!Array.isArray(value) || value.length !== length) return false;
+  for (let index = 0; index < length; index += 1) {
+    const entry = value[index];
+    if (!Object.hasOwn(value, index) || typeof entry !== 'number' || !Number.isFinite(entry)) return false;
+  }
+  return true;
 }
 
 function stringArray(value: unknown): value is string[] {
-  return Array.isArray(value)
-    && value.length > 0
-    && value.every((entry) => typeof entry === 'string' && entry.length > 0);
+  if (!Array.isArray(value) || value.length === 0) return false;
+  for (let index = 0; index < value.length; index += 1) {
+    const entry = value[index];
+    if (!Object.hasOwn(value, index) || typeof entry !== 'string' || entry.length === 0) return false;
+  }
+  return true;
 }
 
 function hasEventMetadata(event: Record<string, unknown>): boolean {
