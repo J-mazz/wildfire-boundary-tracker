@@ -38,7 +38,7 @@ export const onRequestGet = withApiErrors<Env>(async (context) => {
     return Response.json({ error: result.reason }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   }
 
-  const response = frameResponse(result.detections, frame);
+  const response = frameResponse(result, frame);
   const body = await response.clone().json<{ features: unknown[] }>();
   if (body.features.length === 0) {
     return Response.json({ error: 'No detections within the persistence window.' }, { status: 404 });

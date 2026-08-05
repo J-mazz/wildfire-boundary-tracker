@@ -6,7 +6,7 @@
       "benchmark": "firms_parse_sort_dedupe",
       "throughput_items_per_second": 7844613.578,
       "working_set_high_water_bytes": 1005748,
-      "reserved_storage_bytes": 16777248,
+      "reserved_storage_bytes": 16780320,
       "binary_size_bytes": 43416,
       "ratchets": {
         "throughput_items_per_second": {
@@ -20,6 +20,35 @@
           "gate": true
         },
         "reserved_storage_bytes": {
+          "direction": "lower",
+          "toleranceRatio": 0,
+          "gate": true
+        },
+        "binary_size_bytes": {
+          "direction": "lower",
+          "toleranceRatio": 0.15,
+          "gate": true
+        }
+      }
+    },
+    {
+      "benchmark": "firms_timeline_query",
+      "throughput_frames_per_second": 2184778.502,
+      "scratch_high_water_bytes": 3072,
+      "bounded_allocation_count": 2,
+      "binary_size_bytes": 20680,
+      "ratchets": {
+        "throughput_frames_per_second": {
+          "direction": "higher",
+          "toleranceRatio": 0.5,
+          "gate": false
+        },
+        "scratch_high_water_bytes": {
+          "direction": "lower",
+          "toleranceRatio": 0,
+          "gate": true
+        },
+        "bounded_allocation_count": {
           "direction": "lower",
           "toleranceRatio": 0,
           "gate": true

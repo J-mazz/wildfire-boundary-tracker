@@ -12,10 +12,11 @@ FIRMS supplies the recurring VIIRS observations that grow it.
   serially streams each valid response
   bytes directly into a fresh C++26 WebAssembly instance.
 4. C++ parses CSV using raw `const char*` cursors and pointer arithmetic, sorts and
-  deduplicates fixed 64-byte records in place, then grows the footprint with a bounded
-  padding rule.
-5. TypeScript reads the fixed record ABI with `DataView` and serializes catalog and
-  per-frame GeoJSON. It does not parse FIRMS CSV.
+  deduplicates fixed 64-byte records in place, grows the footprint with a bounded padding
+  rule, and answers timeline coverage/range queries over the finalized order.
+5. TypeScript reads the fixed record and 16-byte query-result ABIs with `DataView`, then
+  serializes catalog and per-frame GeoJSON. It does not parse FIRMS CSV or scan records to
+  select timeline windows.
 
 The WASM module is import-free, has a fixed 20 MiB memory, and is instantiated per engine
 operation so mutable linear memory never crosses requests.
@@ -57,11 +58,13 @@ builds to `functions/wasm/firms_engine.wasm`.
 
 `src/cpp/firms_engine.cpp` is a thin, non-module C ABI adapter. The implementation graph under
 `src/cpp/modules/` separates `wildfire.firms.model`, `.numbers`, `.time`, `.csv`, `.schema`,
-`.ingest`, `.order`, `.footprint`, and the `.engine` facade. Model owns the fixed 64-byte ABI
-record and an explicit `EngineState`; the adapter injects a `wildfire.memory::BoundedArena`
-whose fixed storage holds the 8 MiB input region and 131,072-record arena. Allocation failure
-is deterministic, there is no heap fallback or global `new`/`delete` override, and each fresh
-Wasm instance retains the same request-local singleton semantics.
+`.ingest`, `.order`, `.footprint`, `.timeline`, and the `.engine` facade. Model owns the fixed
+64-byte ABI record and an explicit `EngineState`; timeline uses a monotonic sweep for ordered
+catalog frames and binary searches for single-frame ranges. The adapter injects
+`wildfire.memory::BoundedArena` storage for the 8 MiB input region, 131,072-record arena, and
+a 3,072-byte/128-frame query scratch area. Allocation failure is deterministic, there is no
+heap fallback or global `new`/`delete` override, and each fresh Wasm instance retains the same
+request-local singleton semantics.
 
 ## FIRMS quota protection
 

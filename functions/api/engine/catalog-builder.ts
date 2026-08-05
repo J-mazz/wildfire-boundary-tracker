@@ -1,4 +1,4 @@
-import { frameCoverage, frameOf } from './calculations';
+import { frameOf } from './calculations';
 import {
   CADENCE_HOURS,
   MAX_HISTORY_DAYS,
@@ -195,7 +195,8 @@ function buildSnapshot(
 }
 
 export function buildCatalog(input: CatalogInput): CatalogBuild {
-  const coverage = frameCoverage(input.result.detections ?? [], input.plan.frameTimes);
+  const coverage = input.result.timeline?.coverage(input.plan.frameTimes)
+    ?? input.plan.frameTimes.map(() => ({ featureCount: 0, newestObservedAt: null }));
   const built = coverage.map((frame, index) =>
     buildSnapshot(input, index, frame.featureCount, frame.newestObservedAt)
   );

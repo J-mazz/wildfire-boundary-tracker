@@ -26,6 +26,7 @@ std::uint32_t finalize(
         padding_degrees,
         max_span_degrees
     );
+    state.mark_finalized();
     return state.count();
 }
 

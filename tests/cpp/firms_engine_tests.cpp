@@ -30,6 +30,14 @@ const void* firms_records();
 std::uint32_t firms_count();
 std::uint32_t firms_record_stride();
 double firms_bound(std::uint32_t index);
+std::int64_t* firms_query_frames();
+std::uint32_t firms_query_frame_capacity();
+std::uint32_t firms_query_frame_stride();
+const void* firms_query_results();
+std::uint32_t firms_query_result_count();
+std::uint32_t firms_query_result_stride();
+std::int32_t firms_query_coverage(std::uint32_t frame_count, std::uint32_t persistence_hours);
+std::int32_t firms_query_range(std::uint32_t persistence_hours);
 }
 
 namespace {
@@ -213,6 +221,40 @@ void test_allocator_exhaustion_is_explicit() {
     assert(state.count() == 0u);
 }
 
+void test_timeline_query_abi() {
+    constexpr std::string_view csv =
+        "latitude,longitude,acq_date,acq_time,satellite\n"
+        "42,-116,2026-07-18,1200,N\n"
+        "43,-117,2026-07-25,1200,N\n"
+        "44,-118,2026-07-25,1230,N\n"
+        "45,-119,2026-07-25,1500,N\n";
+    firms_reset();
+    assert(ingest(csv) == 4);
+    assert(firms_finalize(-120.0, 40.0, -115.0, 46.0, 0.0, 360.0) == 4u);
+    assert(firms_query_frame_capacity() == wildfire::firms::kTimelineQueryCapacity);
+    assert(firms_query_frame_stride() == sizeof(std::int64_t));
+    assert(firms_query_result_stride() == sizeof(wildfire::firms::TimelineQueryResult));
+
+    std::int64_t* const frames = firms_query_frames();
+    frames[0] = 1'784'980'800'000LL;
+    assert(firms_query_range(168u) == 1);
+    assert(firms_query_result_count() == 1u);
+    const auto* results = static_cast<const wildfire::firms::TimelineQueryResult*>(
+        firms_query_results()
+    );
+    assert(results[0].begin_index == 0u);
+    assert(results[0].feature_count == 3u);
+    assert(results[0].newest_observed_at_ms == 1'784'982'600'000LL);
+
+    frames[0] = 1'784'970'000'000LL;
+    frames[1] = 1'784'980'800'000LL;
+    assert(firms_query_coverage(2u, 168u) == 2);
+    assert(firms_query_result_count() == 2u);
+    assert(results[0].feature_count == 1u);
+    assert(results[1].feature_count == 3u);
+    assert(firms_query_coverage(firms_query_frame_capacity() + 1u, 168u) == -3);
+}
+
 } // namespace
 
 int main() {
@@ -226,4 +268,5 @@ int main() {
     test_sort_identity_includes_satellite();
     test_record_capacity_and_reset();
     test_allocator_exhaustion_is_explicit();
+    test_timeline_query_abi();
 }

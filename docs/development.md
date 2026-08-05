@@ -38,9 +38,10 @@ The shared foundation modules are:
 
 The FIRMS graph is rooted at `wildfire.firms.engine`. Focused named modules own its record
 model and arena-backed state, numeric parsing, Gregorian time parsing, CSV tokenization,
-column resolution, ingestion, ordering/deduplication, and footprint growth. The non-module
-`src/cpp/firms_engine.cpp` file owns only the stable C ABI and one bounded singleton adapter
-per Wasm instance. Geosplat and ncnn remain independent domain targets.
+column resolution, ingestion, ordering/deduplication, footprint growth, and timeline
+coverage/range queries. The non-module `src/cpp/firms_engine.cpp` file owns only the stable
+C ABI and one bounded singleton adapter per Wasm instance. Geosplat and ncnn remain
+independent domain targets.
 
 ## WebAssembly
 
@@ -65,7 +66,8 @@ requests.
 
 `npm run test:cpp` runs assert-based host tests for module helpers, allocator exhaustion and
 reset semantics, quoted/malformed CSV, Gregorian and numeric boundaries, FIRMS capacity and
-record ABI behavior, and geosplat binary decoding.
+record/query ABI behavior, reference-comparison timeline windows, and geosplat binary
+decoding.
 The Node test entry point separately runs deployment/source, Worker Wasm ABI, and TypeScript
 behavior suites.
 
@@ -73,11 +75,12 @@ behavior suites.
 npm run benchmark:cpp
 ```
 
-The FIRMS parse/sort/dedupe and geosplat decode harnesses write
+The FIRMS parse/sort/dedupe, FIRMS timeline-query, and geosplat decode harnesses write
 `build/benchmarks/cpp-current.json`, including throughput, allocation or working-set
 high-water, reserved storage, and executable-size metrics. FIRMS reserves one fixed adapter
 arena and obtains both its input and record regions through `wildfire.memory`; its reserved
-and occupied storage are measured instead of claiming an unobservable heap allocation count.
+and occupied storage are measured. Timeline queries separately ratchet their bounded
+allocation count and scratch high-water mark.
 `benchmarks/cpp_baseline.json` owns the comparison
 directions and tolerances. Update that baseline only after reviewing an intentional ratchet;
 the comparison tool has no performance limits compiled into its code. Throughput is reported

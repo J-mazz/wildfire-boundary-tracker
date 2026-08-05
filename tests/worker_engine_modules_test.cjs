@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const Module = require('node:module');
 const path = require('node:path');
 const { buildSync } = require('esbuild');
 
@@ -8,17 +9,27 @@ buildSync({
   entryPoints: {
     calculations: path.join(root, 'functions/api/engine/calculations.ts'),
     catalog: path.join(root, 'functions/api/engine/catalog-builder.ts'),
+    responses: path.join(root, 'functions/api/engine/responses.ts'),
+    wasm: path.join(root, 'functions/api/engine/wasm.ts'),
     http: path.join(root, 'functions/api/_http.ts'),
     validation: path.join(root, 'functions/api/engine/validation.ts')
   },
   bundle: true,
   platform: 'node',
   format: 'cjs',
-  outdir
+  outdir,
+  external: ['*.wasm']
 });
 
 const calculations = require(path.join(outdir, 'calculations.js'));
 const { buildCatalog, createCatalogPlan } = require(path.join(outdir, 'catalog.js'));
+const { frameResponse } = require(path.join(outdir, 'responses.js'));
+const originalLoad = Module._load;
+Module._load = function load(request, parent, isMain) {
+  return request.endsWith('.wasm') ? {} : originalLoad.call(this, request, parent, isMain);
+};
+const { createTimeline } = require(path.join(outdir, 'wasm.js'));
+Module._load = originalLoad;
 const { fetchUpstream } = require(path.join(outdir, 'http.js'));
 const validation = require(path.join(outdir, 'validation.js'));
 
@@ -51,16 +62,11 @@ const rows = [
   detectionAt('2026-07-18T11:00:00Z'),
   detectionAt('2026-07-25T15:10:00Z')
 ];
-const features = calculations.toFrameFeatures(rows, frameIso);
+const features = calculations.frameFeatures(rows.slice(0, 2), Date.parse(frameIso));
 assert.equal(features.length, 2);
 assert.deepEqual(
   features.map((feature) => feature.properties.ageHours).sort((left, right) => left - right),
   [0, 2.83]
-);
-assert.deepEqual(
-  calculations.frameCoverage(rows, ['2026-07-25T09:00:00Z', frameIso].map(Date.parse))
-    .map((frame) => frame.featureCount),
-  [2, 2]
 );
 assert.equal(calculations.validFrameParam(frameIso, 10, new Date('2026-07-25T13:45:00Z')), true);
 assert.equal(calculations.validFrameParam('2026-07-25T11:00:00Z', 10, new Date('2026-07-25T13:45:00Z')), false);
@@ -88,10 +94,17 @@ const perimeter = {
   featureCount: 1,
   observedAt: '2026-07-25T13:00:00.000Z'
 };
+const timeline = {
+  coverage: () => [
+    { featureCount: 1, newestObservedAt: '2026-07-25T09:10:00Z' },
+    { featureCount: 2, newestObservedAt: '2026-07-25T12:30:00Z' }
+  ],
+  range: () => ({ beginIndex: 0, featureCount: 2, newestObservedAt: '2026-07-25T12:30:00Z' })
+};
 const built = buildCatalog({
   irwinId: incident.irwinId,
   incident,
-  result: { detections: rows.slice(0, 2), bounds: [-116.2, 42.4, -116, 42.6], reason: null },
+  result: { detections: rows.slice(0, 2), timeline, bounds: [-116.2, 42.4, -116, 42.6], reason: null },
   perimeter,
   plan,
   now
@@ -107,7 +120,7 @@ assert.deepEqual(built.cacheableFrames, ['2026-07-25T09:00:00Z', '2026-07-25T12:
 const absent = buildCatalog({
   irwinId: incident.irwinId,
   incident,
-  result: { detections: null, bounds: [-116.2, 42.4, -116, 42.6], reason: 'FIRMS_MAP_KEY is not configured' },
+  result: { detections: null, timeline: null, bounds: [-116.2, 42.4, -116, 42.6], reason: 'FIRMS_MAP_KEY is not configured' },
   perimeter: null,
   plan,
   now
@@ -117,7 +130,60 @@ assert.equal(absent.catalog.snapshots[0].layers[0].status, 'unavailable');
 assert.equal(absent.catalog.snapshots[0].layers[0].statusReason, 'FIRMS_MAP_KEY is not configured');
 assert.deepEqual(absent.cacheableFrames, []);
 
+const queryMemory = new WebAssembly.Memory({ initial: 1 });
+let queryResultCount = 0;
+const queryView = new DataView(queryMemory.buffer);
+const queryEngine = {
+  memory: queryMemory,
+  firms_count: () => 4,
+  firms_query_frames: () => 0,
+  firms_query_frame_capacity: () => 128,
+  firms_query_frame_stride: () => 8,
+  firms_query_results: () => 2048,
+  firms_query_result_count: () => queryResultCount,
+  firms_query_result_stride: () => 16,
+  firms_query_coverage: (count) => {
+    queryResultCount = count;
+    for (let index = 0; index < count; ++index) {
+      const offset = 2048 + index * 16;
+      queryView.setBigInt64(offset, BigInt(Date.parse('2026-07-25T12:30:00Z')), true);
+      queryView.setUint32(offset + 8, index, true);
+      queryView.setUint32(offset + 12, 2, true);
+    }
+    return count;
+  },
+  firms_query_range: () => {
+    queryResultCount = 1;
+    queryView.setBigInt64(2048, BigInt(Date.parse('2026-07-25T12:30:00Z')), true);
+    queryView.setUint32(2056, 1, true);
+    queryView.setUint32(2060, 2, true);
+    return 1;
+  }
+};
+const adaptedTimeline = createTimeline(queryEngine);
+assert.deepEqual(adaptedTimeline.coverage(plan.frameTimes).map((item) => item.featureCount), [2, 2]);
+assert.deepEqual(adaptedTimeline.range(Date.parse(frameIso)), {
+  beginIndex: 1,
+  featureCount: 2,
+  newestObservedAt: '2026-07-25T12:30:00Z'
+});
+assert.equal(
+  queryView.getBigInt64(0, true),
+  BigInt(Date.parse(frameIso)),
+  'adapter must write fixed-width millisecond frame timestamps'
+);
+
 void (async () => {
+  const frameBody = await frameResponse({
+    detections: rows,
+    timeline,
+    bounds: [-116.2, 42.4, -116, 42.6],
+    reason: null
+  }, frameIso).json();
+  assert.equal(frameBody.features.length, 2);
+  assert.equal(frameBody.features[0].properties.observedAt, '2026-07-25T12:30:00Z');
+  assert.equal(frameBody.features[1].properties.observedAt, '2026-07-25T09:10:00Z');
+
   const originalSetTimeout = global.setTimeout;
   const originalClearTimeout = global.clearTimeout;
   const timers = new Map();

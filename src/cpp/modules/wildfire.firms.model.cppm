@@ -64,6 +64,8 @@ public:
     [[nodiscard]] const DetectionRecord* records() const noexcept;
     [[nodiscard]] std::uint32_t count() const noexcept;
     void set_count(std::uint32_t count) noexcept;
+    [[nodiscard]] bool finalized() const noexcept;
+    void mark_finalized() noexcept;
     [[nodiscard]] DetectionRecord* next_record() noexcept;
     void commit_record() noexcept;
     [[nodiscard]] double* bounds() noexcept;
@@ -78,6 +80,7 @@ private:
     std::uint8_t* input_{};
     DetectionRecord* records_{};
     std::uint32_t count_{};
+    bool finalized_{};
     double bounds_[4]{};
     std::size_t input_high_water_{};
     std::size_t record_high_water_{};

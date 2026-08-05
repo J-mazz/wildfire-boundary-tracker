@@ -47,11 +47,10 @@ export const onRequestGet = withApiErrors<Env>(async (context) => {
   }
 
   const built = buildCatalog({ irwinId, incident, result, perimeter, plan, now });
-  const detections = result.detections;
-  const frameCacheWrites = detections
+  const frameCacheWrites = result.detections
     ? built.cacheableFrames.map((frameIso) => cache.put(
         frameCacheRequest(irwinId, frameIso, plan.dayRange),
-        frameResponse(detections, frameIso)
+        frameResponse(result, frameIso)
       ))
     : [];
   if (frameCacheWrites.length > 0) waitUntil(context, 'catalog_frame_cache_put', Promise.all(frameCacheWrites));

@@ -4,6 +4,7 @@ import std;
 
 export import wildfire.firms.model;
 export import wildfire.firms.ingest;
+export import wildfire.firms.timeline;
 
 export namespace wildfire::firms {
 

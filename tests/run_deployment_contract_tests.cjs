@@ -128,7 +128,8 @@ for (const endpoint of ['_engine', 'catalog', 'firms', 'incidents', 'perimeter']
   assert.ok(!exists(`functions/api/${endpoint}.js`), `${endpoint} legacy JavaScript Function remains`);
 }
 
-assert.match(catalogBuilder, /frameCoverage\(/, 'live catalog must mark frames from the persistence window');
+assert.match(catalogBuilder, /result\.timeline\?\.coverage\(/, 'live catalog must use C++ persistence-window coverage');
+assert.doesNotMatch(calculations, /frameCoverage|toFrameFeatures|while \(head|while \(tail/, 'timeline scans must not return to TypeScript');
 assert.doesNotMatch(catalogFunction, /framesWithData/, 'exact-frame-only matching must not return');
 assert.match(vectorLayerSource, /featureAge/, 'renderer must honour per-detection ages over per-layer ages');
 assert.match(ncnnSource, /use_vulkan_compute = true/, 'ncnn executor must require Vulkan compute');
