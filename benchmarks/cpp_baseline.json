@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "description": "Foundation baseline captured with Clang 21, C++26, x86-64, -O3",
+  "benchmarks": [
+    {
+      "benchmark": "firms_parse_sort_dedupe",
+      "throughput_items_per_second": 7844613.578,
+      "working_set_high_water_bytes": 1005748,
+      "reserved_storage_bytes": 16777248,
+      "binary_size_bytes": 43416,
+      "ratchets": {
+        "throughput_items_per_second": {
+          "direction": "higher",
+          "toleranceRatio": 0.5,
+          "gate": false
+        },
+        "working_set_high_water_bytes": {
+          "direction": "lower",
+          "toleranceRatio": 0,
+          "gate": true
+        },
+        "reserved_storage_bytes": {
+          "direction": "lower",
+          "toleranceRatio": 0,
+          "gate": true
+        },
+        "binary_size_bytes": {
+          "direction": "lower",
+          "toleranceRatio": 0.15,
+          "gate": true
+        }
+      }
+    },
+    {
+      "benchmark": "geosplat_decode",
+      "throughput_items_per_second": 173768870.909,
+      "dynamic_allocation_count": 40,
+      "allocation_high_water_bytes": 2359296,
+      "binary_size_bytes": 31176,
+      "ratchets": {
+        "throughput_items_per_second": {
+          "direction": "higher",
+          "toleranceRatio": 0.5,
+          "gate": false
+        },
+        "dynamic_allocation_count": {
+          "direction": "lower",
+          "toleranceRatio": 0,
+          "gate": true
+        },
+        "allocation_high_water_bytes": {
+          "direction": "lower",
+          "toleranceRatio": 0,
+          "gate": true
+        },
+        "binary_size_bytes": {
+          "direction": "lower",
+          "toleranceRatio": 0.15,
+          "gate": true
+        }
+      }
+    }
+  ]
+}

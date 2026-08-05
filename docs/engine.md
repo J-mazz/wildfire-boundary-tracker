@@ -17,7 +17,7 @@ FIRMS supplies the recurring VIIRS observations that grow it.
 5. TypeScript reads the fixed record ABI with `DataView` and serializes catalog and
   per-frame GeoJSON. It does not parse FIRMS CSV.
 
-The WASM module is import-free, has a fixed 32 MiB heap, and is instantiated per engine
+The WASM module is import-free, has a fixed 20 MiB memory, and is instantiated per engine
 operation so mutable linear memory never crosses requests.
 
 ## Endpoints (Pages Functions)
@@ -54,6 +54,14 @@ the request-local WASM adapter, pure frame calculations, cache keys, response
 serialization, and catalog construction. `functions/api/_engine.ts` remains a
 compatibility re-export facade. The compute module is `src/cpp/firms_engine.cpp` and
 builds to `functions/wasm/firms_engine.wasm`.
+
+`src/cpp/firms_engine.cpp` is a thin, non-module C ABI adapter. The implementation graph under
+`src/cpp/modules/` separates `wildfire.firms.model`, `.numbers`, `.time`, `.csv`, `.schema`,
+`.ingest`, `.order`, `.footprint`, and the `.engine` facade. Model owns the fixed 64-byte ABI
+record and an explicit `EngineState`; the adapter injects a `wildfire.memory::BoundedArena`
+whose fixed storage holds the 8 MiB input region and 131,072-record arena. Allocation failure
+is deterministic, there is no heap fallback or global `new`/`delete` override, and each fresh
+Wasm instance retains the same request-local singleton semantics.
 
 ## FIRMS quota protection
 
