@@ -14,10 +14,12 @@ setup is required.
 	and computes the growing footprint. The browser WASM module also retains DEM geosplat
 	decoding and rendering support.
 - **C++26 ncnn/Vulkan**: native, concurrent inference for converted SAM-2 model shards.
+	Named tensor, options, scheduler, and runtime modules keep the executable entrypoint thin.
 	This is an asynchronous publisher, never a request-time Python backend.
 - **Shared C++26 foundation**: `wildfire.core` provides checked bounded/endian helpers and
 	`wildfire.memory` provides bounded arenas, a slab pool, PMR integration, telemetry, and
-	target memory layouts. The FIRMS engine uses an injected bounded arena with no heap fallback.
+	target memory layouts. FIRMS and native scheduling use injected bounded storage with no
+	hidden heap fallback.
 
 Every rendered layer comes from real observations. Nothing is fabricated.
 
