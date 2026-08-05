@@ -19,6 +19,12 @@ precompiles `.pcm` BMIs, compiles interface and implementation objects with the 
 optimization flags, and links host, browser Wasm, Worker Wasm, and native ncnn targets.
 BMIs and objects stay under ignored `build/cpp/` directories.
 
+Every target compiles with Clang `-fmodules`. The graph builds the toolchain's standard
+library module first, and project module units use `import std;` instead of textual standard
+library includes. The driver locates libc++'s `std.cppm` or libstdc++'s `bits/std.cc`;
+set `CXX_STDLIB_MODULE_SOURCE` and, when its `std/*.inc` fragments live separately,
+`CXX_STDLIB_MODULE_INCLUDE` when using a nonstandard toolchain layout.
+
 The explicit Clang graph is intentional: Emscripten 6.0.3 support for CMake `CXX_MODULES`
 could not be proven across all four target shapes. The checked-in manifest avoids a second
 hand-maintained dependency order while keeping the npm commands stable.

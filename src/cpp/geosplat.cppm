@@ -1,15 +1,7 @@
 // geosplat.cppm - decodes the quantized DEM splat binary into GPU-ready instances.
-module;
-#include <cstdint>
-#include <cstring>
-#include <cmath>
-#include <cstddef>
-#include <limits>
-#include <vector>
-#include <algorithm>
-
 export module wildfire.geosplat;
 
+import std;
 import wildfire.core;
 
 namespace {

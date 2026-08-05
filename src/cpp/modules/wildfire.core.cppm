@@ -1,12 +1,10 @@
-module;
-
-#include <cstddef>
-#include <cstdint>
-#include <span>
-
 export module wildfire.core;
 
+import std;
+
 export namespace wildfire::core {
+
+inline constexpr std::size_t default_new_alignment = __STDCPP_DEFAULT_NEW_ALIGNMENT__;
 
 [[nodiscard]] bool is_power_of_two(std::size_t value) noexcept;
 [[nodiscard]] bool checked_add(

@@ -1,15 +1,6 @@
-module;
-
-#include <algorithm>
-#include <cstddef>
-#include <cstdint>
-#include <cstring>
-#include <limits>
-#include <memory_resource>
-#include <new>
-#include <span>
-
 module wildfire.memory;
+
+import std;
 
 namespace wildfire::memory {
 

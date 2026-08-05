@@ -2,20 +2,24 @@
   "schemaVersion": 1,
   "standard": "c++26",
   "modules": {
+    "std": {
+      "kind": "standard-library",
+      "imports": []
+    },
     "wildfire.core": {
       "interface": "src/cpp/modules/wildfire.core.cppm",
       "implementation": "src/cpp/modules/wildfire.core.cpp",
-      "imports": []
+      "imports": ["std"]
     },
     "wildfire.memory": {
       "interface": "src/cpp/modules/wildfire.memory.cppm",
       "implementation": "src/cpp/modules/wildfire.memory.cpp",
-      "imports": ["wildfire.core"]
+      "imports": ["std", "wildfire.core"]
     },
     "wildfire.geosplat": {
       "interface": "src/cpp/geosplat.cppm",
       "implementation": null,
-      "imports": ["wildfire.core"]
+      "imports": ["std", "wildfire.core"]
     }
   },
   "targets": {
