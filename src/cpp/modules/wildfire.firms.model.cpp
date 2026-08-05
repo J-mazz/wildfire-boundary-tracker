@@ -51,6 +51,14 @@ void EngineState::set_count(const std::uint32_t count) noexcept {
     count_ = count;
 }
 
+bool EngineState::finalized() const noexcept {
+    return finalized_;
+}
+
+void EngineState::mark_finalized() noexcept {
+    finalized_ = true;
+}
+
 DetectionRecord* EngineState::next_record() noexcept {
     if (!ready() || count_ >= kRecordCapacity) return nullptr;
     return records_ + count_;
@@ -58,6 +66,7 @@ DetectionRecord* EngineState::next_record() noexcept {
 
 void EngineState::commit_record() noexcept {
     ++count_;
+    finalized_ = false;
     if (count_ > record_high_water_) record_high_water_ = count_;
 }
 
@@ -71,6 +80,7 @@ const double* EngineState::bounds() const noexcept {
 
 void EngineState::reset() noexcept {
     count_ = 0u;
+    finalized_ = false;
 }
 
 void EngineState::note_input_bytes(const std::size_t bytes) noexcept {

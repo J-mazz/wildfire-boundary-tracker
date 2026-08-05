@@ -18,12 +18,24 @@ for (const name of [
   'firms_records',
   'firms_count',
   'firms_record_stride',
-  'firms_bound'
+  'firms_bound',
+  'firms_query_frames',
+  'firms_query_frame_capacity',
+  'firms_query_frame_stride',
+  'firms_query_results',
+  'firms_query_result_count',
+  'firms_query_result_stride',
+  'firms_query_coverage',
+  'firms_query_range'
 ]) assert.ok(exportedNames.has(name), `Worker WASM export missing: ${name}`);
 
 const engine = new WebAssembly.Instance(wasmModule, {}).exports;
 assert.equal(engine.firms_input_capacity(), 8 * 1024 * 1024, 'FIRMS input ABI capacity drifted');
 assert.equal(engine.firms_record_stride(), 64, 'C++/TypeScript record ABI drifted');
+assert.equal(engine.firms_query_frame_capacity(), 128, 'timeline frame capacity drifted');
+assert.equal(engine.firms_query_frame_stride(), 8, 'timeline frame stride drifted');
+assert.equal(engine.firms_query_result_stride(), 16, 'timeline result stride drifted');
+assert.equal(engine.firms_query_range(168), -2, 'queries must reject records before finalization');
 
 const ingest = (contents) => {
   const csv = Buffer.from(contents);
@@ -43,6 +55,21 @@ const records = new DataView(engine.memory.buffer, engine.firms_records(), 128);
 assert.equal(records.getFloat64(0, true), 42.5);
 assert.equal(records.getFloat64(8, true), -116.1);
 assert.equal(Number(records.getBigInt64(16, true)), Date.parse('2026-07-24T22:01:00Z'));
+const queryFrames = new DataView(engine.memory.buffer, engine.firms_query_frames(), 16);
+queryFrames.setBigInt64(0, BigInt(Date.parse('2026-07-25T00:00:00Z')), true);
+assert.equal(engine.firms_query_range(168), 1, 'single-frame range query must succeed');
+assert.equal(engine.firms_query_result_count(), 1);
+let queryResults = new DataView(engine.memory.buffer, engine.firms_query_results(), 16);
+assert.equal(queryResults.getUint32(8, true), 0);
+assert.equal(queryResults.getUint32(12, true), 2);
+assert.equal(Number(queryResults.getBigInt64(0, true)), Date.parse('2026-07-24T23:15:00Z'));
+queryFrames.setBigInt64(0, BigInt(Date.parse('2026-07-24T21:00:00Z')), true);
+queryFrames.setBigInt64(8, BigInt(Date.parse('2026-07-25T00:00:00Z')), true);
+assert.equal(engine.firms_query_coverage(2, 168), 2, 'timeline sweep must return every frame');
+queryResults = new DataView(engine.memory.buffer, engine.firms_query_results(), 32);
+assert.equal(queryResults.getUint32(12, true), 2);
+assert.equal(queryResults.getUint32(28, true), 2);
+assert.equal(engine.firms_query_coverage(129, 168), -3, 'timeline capacity overflow must be explicit');
 
 engine.firms_reset();
 assert.equal(ingest('Exceeded transaction limit'), -2, 'HTTP 200 FIRMS error text must fail CSV validation');

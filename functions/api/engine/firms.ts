@@ -152,7 +152,7 @@ function detectionResult(
 ): DetectionResult {
   if (successfulBatches === 0 && engine.firms_count() === 0) {
     if (failures.length > 0) logDegraded('firms_fetch_failed', failures[0], { failureCount: failures.length });
-    return { detections: null, bounds, reason: 'NASA FIRMS is temporarily unavailable.' };
+    return { detections: null, timeline: null, bounds, reason: 'NASA FIRMS is temporarily unavailable.' };
   }
   if (failures.length > 0) {
     logDegraded('firms_fetch_degraded', failures[0], { failureCount: failures.length, batchCount: fetched.length });
@@ -172,7 +172,7 @@ export async function fetchDetections(
   now = new Date()
 ): Promise<DetectionResult> {
   if (!env.FIRMS_MAP_KEY) {
-    return { detections: null, bounds, reason: 'FIRMS_MAP_KEY is not configured' };
+    return { detections: null, timeline: null, bounds, reason: 'FIRMS_MAP_KEY is not configured' };
   }
 
   const engine = createEngine();

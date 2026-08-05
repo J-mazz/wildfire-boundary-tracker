@@ -32,6 +32,7 @@ export interface Detection {
 
 export interface DetectionResult {
   detections: Detection[] | null;
+  timeline: FirmsTimeline | null;
   bounds: Bounds;
   reason: string | null;
 }
@@ -51,6 +52,15 @@ export interface PerimeterResult {
 export interface FrameCoverage {
   featureCount: number;
   newestObservedAt: string | null;
+}
+
+export interface FrameRange extends FrameCoverage {
+  beginIndex: number;
+}
+
+export interface FirmsTimeline {
+  coverage(frameTimes: readonly number[], persistenceHours?: number): FrameCoverage[];
+  range(frameTime: number, persistenceHours?: number): FrameRange;
 }
 
 export type Defer = (promise: Promise<unknown>, operation: string) => void;

@@ -1,9 +1,7 @@
 import {
   CADENCE_HOURS,
-  PERSISTENCE_HOURS,
   type Bounds,
   type Detection,
-  type FrameCoverage,
   type PointFeature
 } from './domain';
 
@@ -55,12 +53,6 @@ export function validFrameParam(frame: string, days: number, now = new Date()): 
   return frameMs >= earliestFrameMs && frameMs <= latestFrameMs;
 }
 
-export function frameStartMs(observedAtMs: number, cadenceHours = CADENCE_HOURS): number {
-  const date = new Date(observedAtMs);
-  date.setUTCHours(Math.floor(date.getUTCHours() / cadenceHours) * cadenceHours, 0, 0, 0);
-  return date.getTime();
-}
-
 function frameFeatureProperties(row: Detection, ageMs: number): Record<string, unknown> {
   const properties: Record<string, unknown> = {
     observedAt: observedAtOf(row),
@@ -76,10 +68,8 @@ function frameFeatureProperties(row: Detection, ageMs: number): Record<string, u
   return properties;
 }
 
-function toFrameFeature(row: Detection, frameMs: number, windowMs: number): PointFeature | null {
-  if (frameStartMs(row.observedAtMs) > frameMs) return null;
+function toFrameFeature(row: Detection, frameMs: number): PointFeature {
   const ageMs = frameMs - row.observedAtMs;
-  if (ageMs > windowMs) return null;
   return {
     type: 'Feature',
     properties: frameFeatureProperties(row, ageMs),
@@ -87,36 +77,6 @@ function toFrameFeature(row: Detection, frameMs: number, windowMs: number): Poin
   };
 }
 
-export function toFrameFeatures(
-  rows: Detection[],
-  frameIso: string,
-  persistenceHours = PERSISTENCE_HOURS
-): PointFeature[] {
-  const frameMs = Date.parse(frameIso);
-  const windowMs = persistenceHours * 3_600_000;
-  return rows.flatMap((row): PointFeature[] => {
-    const feature = toFrameFeature(row, frameMs, windowMs);
-    return feature ? [feature] : [];
-  });
-}
-
-export function frameCoverage(
-  rows: Detection[],
-  frameTimes: number[],
-  persistenceHours = PERSISTENCE_HOURS
-): FrameCoverage[] {
-  const windowMs = persistenceHours * 3_600_000;
-  const sorted = [...rows].sort((left, right) => left.observedAtMs - right.observedAtMs);
-  const coverage: FrameCoverage[] = [];
-  let head = 0;
-  let tail = 0;
-  for (const frameMs of frameTimes) {
-    while (head < sorted.length && frameStartMs(sorted[head]!.observedAtMs) <= frameMs) ++head;
-    while (tail < head && frameMs - sorted[tail]!.observedAtMs > windowMs) ++tail;
-    coverage.push({
-      featureCount: head - tail,
-      newestObservedAt: head > tail ? observedAtOf(sorted[head - 1]!) : null
-    });
-  }
-  return coverage;
+export function frameFeatures(rows: readonly Detection[], frameMs: number): PointFeature[] {
+  return rows.map((row) => toFrameFeature(row, frameMs));
 }

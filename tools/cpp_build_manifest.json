@@ -63,6 +63,11 @@
       "implementation": "src/cpp/modules/wildfire.firms.footprint.cpp",
       "imports": ["std", "wildfire.firms.model"]
     },
+    "wildfire.firms.timeline": {
+      "interface": "src/cpp/modules/wildfire.firms.timeline.cppm",
+      "implementation": "src/cpp/modules/wildfire.firms.timeline.cpp",
+      "imports": ["std", "wildfire.memory", "wildfire.firms.model"]
+    },
     "wildfire.firms.engine": {
       "interface": "src/cpp/modules/wildfire.firms.engine.cppm",
       "implementation": "src/cpp/modules/wildfire.firms.engine.cpp",
@@ -71,7 +76,8 @@
         "wildfire.firms.model",
         "wildfire.firms.ingest",
         "wildfire.firms.order",
-        "wildfire.firms.footprint"
+        "wildfire.firms.footprint",
+        "wildfire.firms.timeline"
       ]
     },
     "wildfire.geosplat.format": {
@@ -146,6 +152,15 @@
       "linkFlags": [],
       "output": "build/cpp/host-firms-tests/firms_engine_tests"
     },
+    "host-firms-timeline-tests": {
+      "toolchain": "host",
+      "modules": ["wildfire.firms.engine"],
+      "sources": ["tests/cpp/firms_timeline_tests.cpp"],
+      "includeDirectories": [],
+      "compileFlags": ["-O2", "-Wall", "-Wextra", "-Wpedantic"],
+      "linkFlags": [],
+      "output": "build/cpp/host-firms-timeline-tests/firms_timeline_tests"
+    },
     "host-geosplat-tests": {
       "toolchain": "host",
       "modules": ["wildfire.core", "wildfire.memory", "wildfire.geosplat"],
@@ -178,6 +193,15 @@
       "compileFlags": ["-O3", "-flto", "-DNDEBUG", "-DWILDFIRE_BENCHMARK_TELEMETRY", "-Wall", "-Wextra", "-Wpedantic"],
       "linkFlags": ["-fuse-ld=lld"],
       "output": "build/cpp/host-firms-benchmark/firms_benchmark"
+    },
+    "host-firms-timeline-benchmark": {
+      "toolchain": "host",
+      "modules": ["wildfire.firms.engine"],
+      "sources": ["benchmarks/cpp/firms_timeline_benchmark.cpp"],
+      "includeDirectories": [],
+      "compileFlags": ["-O3", "-flto", "-DNDEBUG", "-DWILDFIRE_BENCHMARK_TELEMETRY", "-Wall", "-Wextra", "-Wpedantic"],
+      "linkFlags": ["-fuse-ld=lld"],
+      "output": "build/cpp/host-firms-timeline-benchmark/firms_timeline_benchmark"
     },
     "host-geosplat-benchmark": {
       "toolchain": "host",
@@ -244,7 +268,7 @@
         "-sINITIAL_MEMORY=20971520",
         "-sSTACK_SIZE=1048576",
         "-Wl,--no-entry",
-        "-sEXPORTED_FUNCTIONS=[\"_firms_input\",\"_firms_input_capacity\",\"_firms_reset\",\"_firms_ingest_csv\",\"_firms_finalize\",\"_firms_records\",\"_firms_count\",\"_firms_record_stride\",\"_firms_bound\"]"
+        "-sEXPORTED_FUNCTIONS=[\"_firms_input\",\"_firms_input_capacity\",\"_firms_reset\",\"_firms_ingest_csv\",\"_firms_finalize\",\"_firms_records\",\"_firms_count\",\"_firms_record_stride\",\"_firms_bound\",\"_firms_query_frames\",\"_firms_query_frame_capacity\",\"_firms_query_frame_stride\",\"_firms_query_results\",\"_firms_query_result_count\",\"_firms_query_result_stride\",\"_firms_query_coverage\",\"_firms_query_range\"]"
       ],
       "output": "functions/wasm/firms_engine.wasm"
     },

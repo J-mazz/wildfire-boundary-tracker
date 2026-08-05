@@ -15,6 +15,11 @@ const benchmarks = [
     arguments: []
   },
   {
+    target: 'host-firms-timeline-benchmark',
+    executable: 'build/cpp/host-firms-timeline-benchmark/firms_timeline_benchmark',
+    arguments: []
+  },
+  {
     target: 'host-geosplat-benchmark',
     executable: 'build/cpp/host-geosplat-benchmark/geosplat_benchmark',
     arguments: []
