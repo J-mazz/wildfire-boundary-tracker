@@ -98,6 +98,16 @@ const exerciseVectorCache = async () => {
     2,
     'current incident perimeters must not be frozen in the immutable vector cache'
   );
+  const geoJsonPerimeter = await vectors.load(layer('geojson-perimeter', '/geojson-perimeter', {
+    kind: 'kml',
+    format: 'geojson',
+    contextType: 'incident-perimeter'
+  }));
+  assert.equal(
+    geoJsonPerimeter.features[0].properties.url,
+    '/geojson-perimeter',
+    'an explicit GeoJSON format must override the compatibility KML layer kind'
+  );
 
   const merged = await vectors.merge([
     layer('observed', '/observed', { ageHours: 12 }),
