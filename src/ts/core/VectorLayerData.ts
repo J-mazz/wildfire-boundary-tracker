@@ -79,7 +79,9 @@ export class VectorLayerData {
   private async fetchCollection(layer: SnapshotLayer): Promise<FeatureCollection> {
     const response = await this.fetcher(layer.url!, { cache: 'no-cache' });
     if (!response.ok) throw new Error(`Layer request returned ${response.status}: ${layer.url}`);
-    if (layer.kind === 'kml' || layer.format === 'kml') return this.convertKml(await response.text(), layer.url!);
+    if (layer.format === 'kml' || (!layer.format && layer.kind === 'kml')) {
+      return this.convertKml(await response.text(), layer.url!);
+    }
     return validateFeatureCollection(await response.json(), layer.url!);
   }
 
