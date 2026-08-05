@@ -34,7 +34,13 @@ The shared foundation modules are:
 - `wildfire.core`: overflow-checked size arithmetic, alignment, little-endian loads, and a
   transactional bounded reader.
 - `wildfire.memory`: allocator-injected bounded arena, PMR resource, aligned slab pool,
-  optional allocation telemetry/high-water marks, and host/Worker/browser/native layouts.
+  exact bounded allocations with generation-safe release, optional allocation
+  telemetry/high-water marks, and host/Worker/browser/native layouts.
+
+The geosplat graph additionally separates `wildfire.geosplat.format`,
+`wildfire.geosplat.decode`, and `wildfire.geosplat.storage` behind the compatibility
+`wildfire.geosplat` facade. See [Geosplat browser runtime](geosplat-runtime.md) for ownership
+and linear-memory view guarantees.
 
 The FIRMS graph is rooted at `wildfire.firms.engine`. Focused named modules own its record
 model and arena-backed state, numeric parsing, Gregorian time parsing, CSV tokenization,
@@ -75,7 +81,8 @@ npm run benchmark:cpp
 
 The FIRMS parse/sort/dedupe and geosplat decode harnesses write
 `build/benchmarks/cpp-current.json`, including throughput, allocation or working-set
-high-water, reserved storage, and executable-size metrics. FIRMS reserves one fixed adapter
+high-water, copy volume, bounded storage limits, and executable-size metrics. FIRMS reserves
+one fixed adapter
 arena and obtains both its input and record regions through `wildfire.memory`; its reserved
 and occupied storage are measured instead of claiming an unobservable heap allocation count.
 `benchmarks/cpp_baseline.json` owns the comparison

@@ -74,10 +74,31 @@
         "wildfire.firms.footprint"
       ]
     },
+    "wildfire.geosplat.format": {
+      "interface": "src/cpp/modules/wildfire.geosplat.format.cppm",
+      "implementation": "src/cpp/modules/wildfire.geosplat.format.cpp",
+      "imports": ["std", "wildfire.core"]
+    },
+    "wildfire.geosplat.decode": {
+      "interface": "src/cpp/modules/wildfire.geosplat.decode.cppm",
+      "implementation": "src/cpp/modules/wildfire.geosplat.decode.cpp",
+      "imports": ["std", "wildfire.core", "wildfire.geosplat.format"]
+    },
+    "wildfire.geosplat.storage": {
+      "interface": "src/cpp/modules/wildfire.geosplat.storage.cppm",
+      "implementation": "src/cpp/modules/wildfire.geosplat.storage.cpp",
+      "imports": ["std", "wildfire.core", "wildfire.memory", "wildfire.geosplat.format"]
+    },
     "wildfire.geosplat": {
       "interface": "src/cpp/geosplat.cppm",
-      "implementation": null,
-      "imports": ["std", "wildfire.core"]
+      "implementation": "src/cpp/geosplat.cpp",
+      "imports": [
+        "std",
+        "wildfire.core",
+        "wildfire.geosplat.format",
+        "wildfire.geosplat.decode",
+        "wildfire.geosplat.storage"
+      ]
     }
   },
   "targets": {
@@ -141,7 +162,7 @@
         "-sEXPORT_NAME=createWildfireWasm",
         "-sENVIRONMENT=web",
         "-sFILESYSTEM=0",
-        "-sEXPORTED_FUNCTIONS=[\"_ext_allocate_wasm_buffer\",\"_ext_free_wasm_buffer\",\"_geosplat_decode\",\"_geosplat_data\",\"_geosplat_count\",\"_geosplat_floats_per_splat\",\"_geosplat_release\"]",
+        "-sEXPORTED_FUNCTIONS=[\"_ext_allocate_wasm_buffer\",\"_ext_free_wasm_buffer\",\"_geosplat_decode\",\"_geosplat_data\",\"_geosplat_count\",\"_geosplat_floats_per_splat\",\"_geosplat_generation\",\"_geosplat_release_generation\",\"_geosplat_release\"]",
         "-sEXPORTED_RUNTIME_METHODS=[\"HEAPU8\"]"
       ],
       "output": "public/wasm/wildfire.js",

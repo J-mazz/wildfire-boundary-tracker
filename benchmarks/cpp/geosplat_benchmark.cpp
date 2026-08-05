@@ -60,12 +60,24 @@ int main(const int argc, char** argv) {
     const std::size_t count = static_cast<std::size_t>(width) * height;
     const std::vector<std::uint8_t> fixture = make_fixture(width, height);
 
-    if (wildfire::geosplat::decode(fixture.data(), fixture.size()) != count) return 2;
+    auto* payload = static_cast<std::uint8_t*>(
+        wildfire::geosplat::allocate_payload(fixture.size())
+    );
+    if (payload == nullptr) return 2;
+    std::memcpy(payload, fixture.data(), fixture.size());
+    if (wildfire::geosplat::decode(payload, fixture.size()) != count) return 2;
+    wildfire::geosplat::release_payload(payload);
     wildfire::geosplat::release();
     wildfire::geosplat::benchmark_reset_telemetry();
     const auto start = std::chrono::steady_clock::now();
     for (std::size_t iteration = 0u; iteration < iterations; ++iteration) {
-        if (wildfire::geosplat::decode(fixture.data(), fixture.size()) != count) return 2;
+        payload = static_cast<std::uint8_t*>(
+            wildfire::geosplat::allocate_payload(fixture.size())
+        );
+        if (payload == nullptr) return 2;
+        std::memcpy(payload, fixture.data(), fixture.size());
+        if (wildfire::geosplat::decode(payload, fixture.size()) != count) return 2;
+        wildfire::geosplat::release_payload(payload);
         wildfire::geosplat::release();
     }
     const auto finish = std::chrono::steady_clock::now();
@@ -81,6 +93,18 @@ int main(const int argc, char** argv) {
               << ",\"dynamic_allocation_count\":" << wildfire::geosplat::benchmark_allocation_count()
               << ",\"allocation_high_water_bytes\":"
               << wildfire::geosplat::benchmark_allocation_high_water_bytes()
+              << ",\"payload_allocation_count\":"
+              << wildfire::geosplat::benchmark_payload_allocation_count()
+              << ",\"payload_high_water_bytes\":"
+              << wildfire::geosplat::benchmark_payload_high_water_bytes()
+              << ",\"decoded_allocation_count\":"
+              << wildfire::geosplat::benchmark_decoded_allocation_count()
+              << ",\"decoded_high_water_bytes\":"
+              << wildfire::geosplat::benchmark_decoded_high_water_bytes()
+              << ",\"input_copy_bytes\":" << fixture.size() * iterations
+              << ",\"decoded_copy_bytes\":0"
+              << ",\"storage_limit_bytes\":"
+              << wildfire::geosplat::benchmark_storage_limit_bytes()
               << ",\"input_bytes\":" << fixture.size()
               << "}\n";
 }
