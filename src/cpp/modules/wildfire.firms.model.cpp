@@ -1,10 +1,6 @@
-module;
-
-#include <cstddef>
-#include <cstdint>
-
 module wildfire.firms.model;
 
+import std;
 import wildfire.memory;
 
 namespace wildfire::firms {

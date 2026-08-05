@@ -1,10 +1,6 @@
-module;
-
-#include <cstddef>
-#include <cstdint>
-#include <cstring>
-
 module wildfire.firms.csv;
+
+import std;
 
 namespace wildfire::firms {
 

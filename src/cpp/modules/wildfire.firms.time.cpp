@@ -1,9 +1,6 @@
-module;
-
-#include <cstdint>
-
 module wildfire.firms.time;
 
+import std;
 import wildfire.firms.numbers;
 
 namespace wildfire::firms {

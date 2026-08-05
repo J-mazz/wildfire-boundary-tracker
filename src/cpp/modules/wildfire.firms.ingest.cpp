@@ -1,10 +1,6 @@
-module;
-
-#include <cstdint>
-#include <cstring>
-
 module wildfire.firms.ingest;
 
+import std;
 import wildfire.firms.csv;
 import wildfire.firms.numbers;
 import wildfire.firms.schema;

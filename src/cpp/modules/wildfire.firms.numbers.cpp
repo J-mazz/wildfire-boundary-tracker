@@ -1,10 +1,6 @@
-module;
-
-#include <cmath>
-#include <cstdint>
-#include <limits>
-
 module wildfire.firms.numbers;
+
+import std;
 
 namespace wildfire::firms {
 

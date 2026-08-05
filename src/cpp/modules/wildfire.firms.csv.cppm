@@ -1,10 +1,6 @@
-module;
-
-#include <cstddef>
-#include <cstdint>
-
 export module wildfire.firms.csv;
 
+import std;
 import wildfire.firms.model;
 
 export namespace wildfire::firms {

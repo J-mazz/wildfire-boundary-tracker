@@ -1,8 +1,6 @@
-module;
-
-#include <cstdint>
-
 export module wildfire.firms.engine;
+
+import std;
 
 export import wildfire.firms.model;
 export import wildfire.firms.ingest;

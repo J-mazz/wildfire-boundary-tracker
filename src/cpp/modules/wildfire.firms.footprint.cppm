@@ -1,7 +1,6 @@
-module;
-
 export module wildfire.firms.footprint;
 
+import std;
 import wildfire.firms.model;
 
 export namespace wildfire::firms {

@@ -1,10 +1,6 @@
-module;
-
-#include <cstddef>
-#include <cstdint>
-
 export module wildfire.firms.model;
 
+import std;
 import wildfire.memory;
 
 export namespace wildfire::firms {
@@ -33,9 +29,9 @@ struct DetectionRecord {
 };
 
 static_assert(sizeof(DetectionRecord) == 64u);
-static_assert(offsetof(DetectionRecord, observed_at_ms) == 16u);
-static_assert(offsetof(DetectionRecord, satellite) == 36u);
-static_assert(offsetof(DetectionRecord, day_night) == 60u);
+static_assert(__builtin_offsetof(DetectionRecord, observed_at_ms) == 16u);
+static_assert(__builtin_offsetof(DetectionRecord, satellite) == 36u);
+static_assert(__builtin_offsetof(DetectionRecord, day_night) == 60u);
 
 struct Field {
     const char* begin;

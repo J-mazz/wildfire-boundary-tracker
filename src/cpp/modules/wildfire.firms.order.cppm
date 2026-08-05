@@ -1,9 +1,6 @@
-module;
-
-#include <cstdint>
-
 export module wildfire.firms.order;
 
+import std;
 import wildfire.firms.model;
 
 export namespace wildfire::firms {

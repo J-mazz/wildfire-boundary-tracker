@@ -40,9 +40,6 @@ const httpMiddleware = read('functions/api/_http.ts');
 const ncnnSource = read('src/native/ncnn_vulkan_batch.cpp');
 const cppBuildDriver = read('tools/cpp_build.mjs');
 const cppManifest = JSON.parse(read('tools/cpp_build_manifest.json'));
-const coreModule = read('src/cpp/modules/wildfire.core.cppm');
-const memoryModule = read('src/cpp/modules/wildfire.memory.cppm');
-const geosplatModule = read('src/cpp/geosplat.cppm');
 
 assert.match(landing, /Current wildfires/, 'root must be the NIFC incident picker');
 assert.match(landing, /fires\.js/, 'landing page script missing');
@@ -66,17 +63,15 @@ assert.match(bundle, /wildfire-geosplat/, 'geosplat renderer was not bundled');
 
 assert.equal(cppManifest.standard, 'c++26', 'C++ build graph must compile as C++26');
 assert.equal(cppManifest.modules.std.kind, 'standard-library', 'standard library module missing');
-for (const moduleName of ['wildfire.core', 'wildfire.memory', 'wildfire.geosplat']) {
-  assert.ok(cppManifest.modules[moduleName].imports.includes('std'), `${moduleName} must import std`);
-}
 assert.match(cppBuildDriver, /'-fmodules'/, 'C++ targets must enable Clang modules');
-for (const [name, source] of [
-  ['wildfire.core', coreModule],
-  ['wildfire.memory', memoryModule],
-  ['wildfire.geosplat', geosplatModule]
-]) {
-  assert.match(source, /import std;/, `${name} must consume the standard library module`);
-  assert.doesNotMatch(source, /#include\s*</, `${name} retained textual standard library includes`);
+for (const [moduleName, definition] of Object.entries(cppManifest.modules)) {
+  if (definition.kind === 'standard-library') continue;
+  assert.ok(definition.imports.includes('std'), `${moduleName} must import std`);
+  for (const sourcePath of [definition.interface, definition.implementation].filter(Boolean)) {
+    const source = read(sourcePath);
+    assert.match(source, /import std;/, `${sourcePath} must consume the standard library module`);
+    assert.doesNotMatch(source, /#include\s*</, `${sourcePath} retained textual standard library includes`);
+  }
 }
 const browserTarget = cppManifest.targets['browser-wasm'];
 const workerTarget = cppManifest.targets['worker-wasm'];

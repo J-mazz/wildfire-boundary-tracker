@@ -1,9 +1,6 @@
-module;
-
-#include <cstdint>
-
 module wildfire.firms.engine;
 
+import std;
 import wildfire.firms.footprint;
 import wildfire.firms.ingest;
 import wildfire.firms.order;

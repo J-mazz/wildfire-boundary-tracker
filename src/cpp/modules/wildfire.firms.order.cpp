@@ -1,10 +1,6 @@
-module;
-
-#include <algorithm>
-#include <cstdint>
-#include <cstring>
-
 module wildfire.firms.order;
+
+import std;
 
 namespace wildfire::firms {
 

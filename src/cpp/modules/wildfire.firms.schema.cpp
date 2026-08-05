@@ -1,10 +1,6 @@
-module;
-
-#include <cstdint>
-#include <limits>
-
 module wildfire.firms.schema;
 
+import std;
 import wildfire.firms.csv;
 import wildfire.firms.numbers;
 

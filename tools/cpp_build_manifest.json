@@ -19,32 +19,33 @@
     "wildfire.firms.model": {
       "interface": "src/cpp/modules/wildfire.firms.model.cppm",
       "implementation": "src/cpp/modules/wildfire.firms.model.cpp",
-      "imports": ["wildfire.memory"]
+      "imports": ["std", "wildfire.memory"]
     },
     "wildfire.firms.numbers": {
       "interface": "src/cpp/modules/wildfire.firms.numbers.cppm",
       "implementation": "src/cpp/modules/wildfire.firms.numbers.cpp",
-      "imports": ["wildfire.firms.model"]
+      "imports": ["std", "wildfire.firms.model"]
     },
     "wildfire.firms.time": {
       "interface": "src/cpp/modules/wildfire.firms.time.cppm",
       "implementation": "src/cpp/modules/wildfire.firms.time.cpp",
-      "imports": ["wildfire.firms.model", "wildfire.firms.numbers"]
+      "imports": ["std", "wildfire.firms.model", "wildfire.firms.numbers"]
     },
     "wildfire.firms.csv": {
       "interface": "src/cpp/modules/wildfire.firms.csv.cppm",
       "implementation": "src/cpp/modules/wildfire.firms.csv.cpp",
-      "imports": ["wildfire.firms.model"]
+      "imports": ["std", "wildfire.firms.model"]
     },
     "wildfire.firms.schema": {
       "interface": "src/cpp/modules/wildfire.firms.schema.cppm",
       "implementation": "src/cpp/modules/wildfire.firms.schema.cpp",
-      "imports": ["wildfire.firms.model", "wildfire.firms.csv", "wildfire.firms.numbers"]
+      "imports": ["std", "wildfire.firms.model", "wildfire.firms.csv", "wildfire.firms.numbers"]
     },
     "wildfire.firms.ingest": {
       "interface": "src/cpp/modules/wildfire.firms.ingest.cppm",
       "implementation": "src/cpp/modules/wildfire.firms.ingest.cpp",
       "imports": [
+        "std",
         "wildfire.firms.model",
         "wildfire.firms.csv",
         "wildfire.firms.numbers",
@@ -55,17 +56,18 @@
     "wildfire.firms.order": {
       "interface": "src/cpp/modules/wildfire.firms.order.cppm",
       "implementation": "src/cpp/modules/wildfire.firms.order.cpp",
-      "imports": ["wildfire.firms.model"]
+      "imports": ["std", "wildfire.firms.model"]
     },
     "wildfire.firms.footprint": {
       "interface": "src/cpp/modules/wildfire.firms.footprint.cppm",
       "implementation": "src/cpp/modules/wildfire.firms.footprint.cpp",
-      "imports": ["wildfire.firms.model"]
+      "imports": ["std", "wildfire.firms.model"]
     },
     "wildfire.firms.engine": {
       "interface": "src/cpp/modules/wildfire.firms.engine.cppm",
       "implementation": "src/cpp/modules/wildfire.firms.engine.cpp",
       "imports": [
+        "std",
         "wildfire.firms.model",
         "wildfire.firms.ingest",
         "wildfire.firms.order",

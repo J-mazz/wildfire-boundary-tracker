@@ -1,9 +1,6 @@
-module;
-
-#include <algorithm>
-#include <cstdint>
-
 module wildfire.firms.footprint;
+
+import std;
 
 namespace wildfire::firms {
 
