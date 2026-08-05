@@ -75,9 +75,13 @@ export class WasmDecodedInstances implements DecodedInstances {
       throw new Error('WASM geosplat output ownership is stale.');
     }
     const floatCount = this.count * this.floatsPerSplat;
+    if (!Number.isSafeInteger(floatCount) || floatCount <= 0) {
+      throw new Error('WASM geosplat output length overflows safe integer range.');
+    }
     const byteLength = floatCount * Float32Array.BYTES_PER_ELEMENT;
     const heap = this.wasm.HEAPU8;
-    if (!Number.isSafeInteger(byteLength) || this.dataPtr + byteLength > heap.byteLength) {
+    const end = this.dataPtr + byteLength;
+    if (!Number.isSafeInteger(byteLength) || !Number.isSafeInteger(end) || end > heap.byteLength) {
       throw new Error('WASM geosplat output exceeds linear memory.');
     }
     const view = new Float32Array(heap.buffer, this.dataPtr, floatCount);

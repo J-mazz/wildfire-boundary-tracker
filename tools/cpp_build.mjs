@@ -21,6 +21,15 @@ if (!target) {
 const compiler = target.toolchain === 'emscripten'
   ? (process.env.EMCXX || 'em++')
   : (process.env.CLANGXX || 'clang++');
+const hostStandardLibrary = target.toolchain === 'host'
+  ? process.env.CXX_HOST_STDLIB
+  : undefined;
+if (hostStandardLibrary && !['libc++', 'libstdc++'].includes(hostStandardLibrary)) {
+  throw new Error('CXX_HOST_STDLIB must be libc++ or libstdc++');
+}
+const standardLibraryFlags = hostStandardLibrary
+  ? [`-stdlib=${hostStandardLibrary}`]
+  : [];
 const buildDirectory = path.join(root, 'build/cpp', targetName);
 const moduleDirectory = path.join(buildDirectory, 'modules');
 const objectDirectory = path.join(buildDirectory, 'objects');
@@ -46,6 +55,7 @@ function compilerIncludeDirectories() {
   const result = spawnSync(compiler, [
     `-std=${manifest.standard}`,
     '-fmodules',
+    ...standardLibraryFlags,
     ...target.compileFlags,
     '-E',
     '-x', 'c++',
@@ -79,16 +89,26 @@ function compilerIncludeDirectories() {
 
 function standardLibraryModule() {
   const executableDirectory = path.dirname(resolveExecutable(compiler));
+  const compilerDirectories = compilerIncludeDirectories();
   const candidates = [{
     source: process.env.CXX_STDLIB_MODULE_SOURCE,
     includeDirectory: process.env.CXX_STDLIB_MODULE_INCLUDE
   }];
-  for (const directory of compilerIncludeDirectories()) {
-    candidates.push(
-      { source: path.join(directory, 'bits/std.cc') },
-      { source: path.join(directory, 'std.cppm') },
-      { source: path.resolve(directory, '../../../share/libc++/v1/std.cppm') }
-    );
+  for (const directory of compilerDirectories) {
+    const resolvedDirectory = fs.existsSync(directory) ? fs.realpathSync(directory) : directory;
+    const config = path.join(directory, '__config');
+    const configuredDirectory = fs.existsSync(config)
+      ? path.dirname(fs.realpathSync(config))
+      : null;
+    for (const searchDirectory of new Set(
+      [directory, resolvedDirectory, configuredDirectory].filter(Boolean)
+    )) {
+      candidates.push(
+        { source: path.join(searchDirectory, 'bits/std.cc') },
+        { source: path.join(searchDirectory, 'std.cppm') },
+        { source: path.resolve(searchDirectory, '../../../share/libc++/v1/std.cppm') }
+      );
+    }
   }
   candidates.push({
     source: path.resolve(
@@ -105,9 +125,26 @@ function standardLibraryModule() {
     return fs.existsSync(path.join(includeDirectory, 'std/algorithm.inc'));
   });
   if (selected) {
+    const moduleDirectory = selected.source.endsWith('std.cppm')
+      ? (selected.includeDirectory ?? path.dirname(selected.source))
+      : null;
+    const relativeHeaderDirectory = path.resolve(
+      path.dirname(selected.source),
+      '../../../include/c++/v1'
+    );
+    const headerDirectory = compilerDirectories.find((directory) => (
+      fs.existsSync(path.join(directory, '__config'))
+    )) ?? (
+      fs.existsSync(path.join(relativeHeaderDirectory, '__config'))
+        ? relativeHeaderDirectory
+        : null
+    );
+    const includeDirectories = [...new Set(
+      [moduleDirectory, headerDirectory].filter(Boolean)
+    )];
     return {
       source: selected.source,
-      includeFlags: selected.includeDirectory ? ['-I', selected.includeDirectory] : []
+      includeFlags: includeDirectories.flatMap((directory) => ['-I', directory])
     };
   }
   throw new Error(
@@ -237,6 +274,7 @@ const commonFlags = [
   '-fmodules',
   '-ffunction-sections',
   '-fdata-sections',
+...standardLibraryFlags,
   ...target.compileFlags,
   `-fprebuilt-module-path=${moduleDirectory}`
 ];
@@ -262,6 +300,7 @@ if (target.rpathEnvironment) {
 }
 run(compiler, [
   `-std=${manifest.standard}`,
+  ...standardLibraryFlags,
   ...target.compileFlags,
   ...objects,
   deadSectionLinkFlag,
