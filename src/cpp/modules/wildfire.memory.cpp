@@ -106,6 +106,95 @@ std::size_t BoundedArena::high_water() const noexcept {
     return high_water_;
 }
 
+ExactAllocation::ExactAllocation(
+    const std::size_t byte_limit,
+    const AllocateFunction allocate,
+    const DeallocateFunction deallocate,
+    AllocationTelemetry* const telemetry
+) noexcept
+    : allocate_(allocate),
+      deallocate_(deallocate),
+      telemetry_(telemetry),
+      byte_limit_(byte_limit) {}
+
+ExactAllocation::~ExactAllocation() {
+    reset();
+}
+
+bool ExactAllocation::valid_request(const std::size_t bytes) noexcept {
+    const bool valid = bytes != 0u && bytes <= byte_limit_
+        && allocate_ != nullptr && deallocate_ != nullptr;
+    if (!valid && telemetry_ != nullptr) telemetry_->record_failure();
+    return valid;
+}
+
+void ExactAllocation::advance_generation() noexcept {
+    ++generation_;
+    if (generation_ == 0u) ++generation_;
+}
+
+void* ExactAllocation::acquire(const std::size_t bytes) noexcept {
+    if (data_ != nullptr || !valid_request(bytes)) {
+        if (data_ != nullptr && telemetry_ != nullptr) telemetry_->record_failure();
+        return nullptr;
+    }
+    data_ = allocate_(bytes);
+    if (data_ == nullptr) {
+        if (telemetry_ != nullptr) telemetry_->record_failure();
+        return nullptr;
+    }
+    size_ = bytes;
+    advance_generation();
+    if (telemetry_ != nullptr) telemetry_->record_allocation(bytes);
+    return data_;
+}
+
+void* ExactAllocation::replace(const std::size_t bytes) noexcept {
+    if (!valid_request(bytes)) return nullptr;
+    reset();
+    void* const replacement = allocate_(bytes);
+    if (replacement == nullptr) {
+        if (telemetry_ != nullptr) telemetry_->record_failure();
+        return nullptr;
+    }
+    if (telemetry_ != nullptr) telemetry_->record_allocation(bytes);
+    data_ = replacement;
+    size_ = bytes;
+    advance_generation();
+    return data_;
+}
+
+bool ExactAllocation::release(const std::uint32_t generation) noexcept {
+    if (data_ == nullptr || generation == 0u || generation != generation_) return false;
+    reset();
+    return true;
+}
+
+void ExactAllocation::reset() noexcept {
+    if (data_ == nullptr) return;
+    if (telemetry_ != nullptr) telemetry_->record_release(size_);
+    deallocate_(data_);
+    data_ = nullptr;
+    size_ = 0u;
+    advance_generation();
+}
+
+void* ExactAllocation::data() const noexcept {
+    return data_;
+}
+
+std::size_t ExactAllocation::size() const noexcept {
+    return size_;
+}
+
+std::size_t ExactAllocation::byte_limit() const noexcept {
+    return byte_limit_;
+}
+
+std::uint32_t ExactAllocation::generation() const noexcept {
+    return generation_;
+}
+
 ArenaResource::ArenaResource(BoundedArena& arena) noexcept
     : arena_(&arena) {}
 

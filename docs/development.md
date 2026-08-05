@@ -23,7 +23,9 @@ Every target compiles with Clang `-fmodules`. The graph builds the toolchain's s
 library module first, and project module units use `import std;` instead of textual standard
 library includes. The driver locates libc++'s `std.cppm` or libstdc++'s `bits/std.cc`;
 set `CXX_STDLIB_MODULE_SOURCE` and, when its `std/*.inc` fragments live separately,
-`CXX_STDLIB_MODULE_INCLUDE` when using a nonstandard toolchain layout.
+`CXX_STDLIB_MODULE_INCLUDE` when using a nonstandard toolchain layout. Set
+`CXX_HOST_STDLIB=libc++` or `libstdc++` to select a host library explicitly; CI installs
+libc++ 18 module sources/headers and compiles them with pinned Clang 21.
 
 The explicit Clang graph is intentional: Emscripten 6.0.3 support for CMake `CXX_MODULES`
 could not be proven across all four target shapes. The checked-in manifest avoids a second
@@ -34,7 +36,13 @@ The shared foundation modules are:
 - `wildfire.core`: overflow-checked size arithmetic, alignment, little-endian loads, and a
   transactional bounded reader.
 - `wildfire.memory`: allocator-injected bounded arena, PMR resource, aligned slab pool,
-  optional allocation telemetry/high-water marks, and host/Worker/browser/native layouts.
+  exact bounded allocations with generation-safe release, optional allocation
+  telemetry/high-water marks, and host/Worker/browser/native layouts.
+
+The geosplat graph additionally separates `wildfire.geosplat.format`,
+`wildfire.geosplat.decode`, and `wildfire.geosplat.storage` behind the compatibility
+`wildfire.geosplat` facade. See [Geosplat browser runtime](geosplat-runtime.md) for ownership
+and linear-memory view guarantees.
 
 The FIRMS graph is rooted at `wildfire.firms.engine`. Focused named modules own its record
 model and arena-backed state, numeric parsing, Gregorian time parsing, CSV tokenization,
@@ -77,7 +85,8 @@ npm run benchmark:cpp
 
 The FIRMS parse/sort/dedupe, FIRMS timeline-query, and geosplat decode harnesses write
 `build/benchmarks/cpp-current.json`, including throughput, allocation or working-set
-high-water, reserved storage, and executable-size metrics. FIRMS reserves one fixed adapter
+high-water, copy volume, bounded storage limits, and executable-size metrics. FIRMS reserves
+one fixed adapter
 arena and obtains both its input and record regions through `wildfire.memory`; its reserved
 and occupied storage are measured. Timeline queries separately ratchet their bounded
 allocation count and scratch high-water mark.

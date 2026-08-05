@@ -62,10 +62,17 @@
     },
     {
       "benchmark": "geosplat_decode",
-      "throughput_items_per_second": 173768870.909,
-      "dynamic_allocation_count": 40,
-      "allocation_high_water_bytes": 2359296,
-      "binary_size_bytes": 31176,
+      "throughput_items_per_second": 193570205.973,
+      "dynamic_allocation_count": 80,
+      "allocation_high_water_bytes": 2818064,
+      "payload_allocation_count": 40,
+      "payload_high_water_bytes": 458768,
+      "decoded_allocation_count": 40,
+      "decoded_high_water_bytes": 2359296,
+      "input_copy_bytes": 18350720,
+      "decoded_copy_bytes": 0,
+      "storage_limit_bytes": 180355088,
+      "binary_size_bytes": 30160,
       "ratchets": {
         "throughput_items_per_second": {
           "direction": "higher",
@@ -78,6 +85,41 @@
           "gate": true
         },
         "allocation_high_water_bytes": {
+          "direction": "lower",
+          "toleranceRatio": 0,
+          "gate": true
+        },
+        "payload_allocation_count": {
+          "direction": "lower",
+          "toleranceRatio": 0,
+          "gate": true
+        },
+        "payload_high_water_bytes": {
+          "direction": "lower",
+          "toleranceRatio": 0,
+          "gate": true
+        },
+        "decoded_allocation_count": {
+          "direction": "lower",
+          "toleranceRatio": 0,
+          "gate": true
+        },
+        "decoded_high_water_bytes": {
+          "direction": "lower",
+          "toleranceRatio": 0,
+          "gate": true
+        },
+        "input_copy_bytes": {
+          "direction": "lower",
+          "toleranceRatio": 0,
+          "gate": true
+        },
+        "decoded_copy_bytes": {
+          "direction": "lower",
+          "toleranceRatio": 0,
+          "gate": true
+        },
+        "storage_limit_bytes": {
           "direction": "lower",
           "toleranceRatio": 0,
           "gate": true

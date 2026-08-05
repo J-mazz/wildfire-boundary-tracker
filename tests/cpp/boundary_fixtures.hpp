@@ -32,6 +32,25 @@ inline constexpr std::array<std::uint8_t, 23> geosplat_one_cell{
     0x00, 0x00              // octahedral normal
 };
 
+inline constexpr std::array<std::uint8_t, 23> geosplat_endian_probe{
+    0x47, 0x53, 0x50, 0x31, // GSP1
+    0x01, 0x00,             // width
+    0x01, 0x00,             // height
+    0x00, 0x00, 0x80, 0x3f, // min height: 1.0f
+    0x00, 0x00, 0x80, 0x3f, // max height: 1.0f
+    0x34, 0x12,             // quantized height: 0x1234
+    0x01, 0x02, 0x03,       // RGB
+    0x81, 0x7f              // signed normal xy: -127, 127
+};
+
+inline constexpr std::array<std::uint8_t, 16> geosplat_cap_header{
+    0x47, 0x53, 0x50, 0x31, // GSP1
+    0x00, 0x10,             // width: 4096
+    0x00, 0x04,             // height: 1024
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00
+};
+
 inline constexpr std::array<std::uint8_t, 16> geosplat_wasm32_overflow_header{
     0x47, 0x53, 0x50, 0x31, // GSP1
     0xff, 0xff,             // width: 65535
