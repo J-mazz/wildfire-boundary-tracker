@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 
 import wildfire.geosplat;
 
@@ -23,6 +24,44 @@ void test_rejects_invalid_headers() {
     invalid[4] = 0u;
     assert(wildfire::geosplat::decode(invalid.data(), invalid.size()) == 0u);
     assert(wildfire::geosplat::decode(valid.data(), valid.size() - 1u) == 0u);
+}
+
+void test_rejects_overflow_dimensions() {
+    const auto& wasm_overflow = wildfire::tests::fixtures::geosplat_wasm32_overflow_header;
+    assert(wildfire::geosplat::decode(
+        wasm_overflow.data(),
+        wasm_overflow.size()
+    ) == 0u);
+    constexpr std::size_t maximum_grid_count = 65535ull * 65535ull;
+    constexpr std::size_t maximum_grid_length = 16ull + maximum_grid_count * 7ull;
+    assert(!wildfire::geosplat::validate_layout_for_testing(
+        wasm_overflow.data(),
+        maximum_grid_length,
+        std::numeric_limits<std::uint32_t>::max(),
+        std::numeric_limits<std::uint32_t>::max()
+    ));
+
+    const auto& capacity_overflow =
+        wildfire::tests::fixtures::geosplat_capacity_overflow_header;
+    assert(wildfire::geosplat::decode(
+        capacity_overflow.data(),
+        capacity_overflow.size()
+    ) == 0u);
+    constexpr std::size_t oversized_count = 4097u * 1024u;
+    constexpr std::size_t oversized_length = 16u + oversized_count * 7u;
+    assert(!wildfire::geosplat::validate_layout_for_testing(
+        capacity_overflow.data(),
+        oversized_length,
+        std::numeric_limits<std::size_t>::max(),
+        wildfire::geosplat::kMaxSplatCount
+    ));
+    assert(wildfire::geosplat::validate_layout_for_testing(
+        capacity_overflow.data(),
+        oversized_length,
+        std::numeric_limits<std::size_t>::max(),
+        oversized_count
+    ));
+    assert(wildfire::geosplat::kMaxSplatCount == 4u * 1024u * 1024u);
 }
 
 void test_decodes_one_cell_fixture() {
@@ -54,5 +93,6 @@ void test_decodes_one_cell_fixture() {
 
 int main() {
     test_rejects_invalid_headers();
+    test_rejects_overflow_dimensions();
     test_decodes_one_cell_fixture();
 }

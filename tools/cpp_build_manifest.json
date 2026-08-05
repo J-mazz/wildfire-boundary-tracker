@@ -15,7 +15,7 @@
     "wildfire.geosplat": {
       "interface": "src/cpp/geosplat.cppm",
       "implementation": null,
-      "imports": []
+      "imports": ["wildfire.core"]
     }
   },
   "targets": {
@@ -42,7 +42,7 @@
       "modules": ["wildfire.core", "wildfire.memory", "wildfire.geosplat"],
       "sources": ["tests/cpp/geosplat_tests.cpp"],
       "includeDirectories": ["tests/cpp"],
-      "compileFlags": ["-O2", "-Wall", "-Wextra", "-Wpedantic"],
+      "compileFlags": ["-O2", "-DWILDFIRE_GEOSPLAT_TESTING", "-Wall", "-Wextra", "-Wpedantic"],
       "linkFlags": [],
       "output": "build/cpp/host-geosplat-tests/geosplat_tests"
     },

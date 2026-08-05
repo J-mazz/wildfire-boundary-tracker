@@ -42,6 +42,10 @@ npm run build:wasm         # browser DEM geosplat decoder
 npm run build:worker-wasm  # import-free FIRMS parser and footprint engine
 ```
 
+The browser decoder validates every grid, payload, and output-size calculation with checked
+`size_t` arithmetic before pointer offsets or allocation. It rejects grids above 4,194,304
+splats, keeping the input plus 36-byte output records within the browser Wasm memory budget.
+
 `npm run build:pages` builds both before Wrangler bundles the Pages Functions.
 `npm run dev` builds that same artifact and serves it through `wrangler pages dev`, so
 the `/api/incidents`, `/api/catalog`, and `/api/firms` paths run in the local loop. It
@@ -96,6 +100,12 @@ bash tools/run_sam2_ncnn.sh \
   --output-dir OUTPUT_DIR \
   INPUT_1.nct INPUT_2.nct
 ```
+
+The current native CLI preserves its original behavior of assigning
+`hardware_concurrency()` threads to every extractor. With multiple `--workers`, that can
+oversubscribe the CPU by `workers * hardware_concurrency`. The later native modularization
+phase must add an explicit total/per-extractor thread budget (coordinated with target memory
+layout configuration) rather than changing this foundation PR's CLI behavior.
 
 NCT1 is five little-endian `uint32` values (`magic`, width, height, channels, elements)
 followed by channel-major float32 data. Outputs use the NCO1 header documented by

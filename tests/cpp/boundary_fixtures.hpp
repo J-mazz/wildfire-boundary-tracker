@@ -32,4 +32,20 @@ inline constexpr std::array<std::uint8_t, 23> geosplat_one_cell{
     0x00, 0x00              // octahedral normal
 };
 
+inline constexpr std::array<std::uint8_t, 16> geosplat_wasm32_overflow_header{
+    0x47, 0x53, 0x50, 0x31, // GSP1
+    0xff, 0xff,             // width: 65535
+    0xff, 0xff,             // height: 65535
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00
+};
+
+inline constexpr std::array<std::uint8_t, 16> geosplat_capacity_overflow_header{
+    0x47, 0x53, 0x50, 0x31, // GSP1
+    0x01, 0x10,             // width: 4097
+    0x00, 0x04,             // height: 1024
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00
+};
+
 } // namespace wildfire::tests::fixtures
